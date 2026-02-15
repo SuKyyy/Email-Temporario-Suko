@@ -14,6 +14,7 @@ export interface Email {
 interface InboxProps {
   emails: Email[]
   activeEmail: string | null
+  activeDomain: string | null
   hasSearched: boolean
 }
 
@@ -80,14 +81,14 @@ function EmailItem({ email }: { email: Email }) {
   )
 }
 
-export function Inbox({ emails, activeEmail, hasSearched }: InboxProps) {
+export function Inbox({ emails, activeEmail, activeDomain, hasSearched }: InboxProps) {
   return (
     <div className="overflow-hidden rounded-xl border border-border bg-card shadow-lg">
       <div className="flex items-center justify-between border-b border-border px-5 py-3">
         <h3 className="text-sm font-semibold text-card-foreground">Inbox</h3>
-        {activeEmail && (
+        {activeEmail && activeDomain && (
           <span className="rounded-full bg-secondary px-3 py-0.5 font-mono text-xs text-muted-foreground">
-            {activeEmail}@sukospot.shop
+            {activeEmail}{activeDomain}
           </span>
         )}
         {emails.length > 0 && (

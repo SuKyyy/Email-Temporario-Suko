@@ -2,14 +2,16 @@
 
 import { useState, useCallback } from "react"
 import { SiteHeader } from "@/components/site-header"
-import { EmailInput } from "@/components/email-input"
+import { EmailInput, DOMAINS, type Domain } from "@/components/email-input"
 import { Inbox, type Email } from "@/components/inbox"
 
 export default function Page() {
   const [username, setUsername] = useState("")
+  const [selectedDomain, setSelectedDomain] = useState<Domain>(DOMAINS[0])
   const [emails, setEmails] = useState<Email[]>([])
   const [loading, setLoading] = useState(false)
   const [activeEmail, setActiveEmail] = useState<string | null>(null)
+  const [activeDomain, setActiveDomain] = useState<string | null>(null)
   const [hasSearched, setHasSearched] = useState(false)
 
   const handleCheckMail = useCallback(async () => {
@@ -19,16 +21,19 @@ export default function Page() {
     setHasSearched(true)
 
     try {
-      const response = await fetch(`/api/check-mail?user=${encodeURIComponent(username.trim())}`)
+      const response = await fetch(
+        `/api/check-mail?user=${encodeURIComponent(username.trim())}&domain=${encodeURIComponent(selectedDomain)}`
+      )
       const data = await response.json()
       setEmails(data.emails || [])
       setActiveEmail(username.trim())
+      setActiveDomain(selectedDomain)
     } catch {
       setEmails([])
     } finally {
       setLoading(false)
     }
-  }, [username])
+  }, [username, selectedDomain])
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -41,18 +46,25 @@ export default function Page() {
               Temporary Email Inbox
             </h1>
             <p className="mt-2 text-sm text-muted-foreground">
-              Receive emails instantly at your own @sukospot.shop address
+              Receive emails instantly at your temporary address
             </p>
           </div>
 
           <EmailInput
             username={username}
+            selectedDomain={selectedDomain}
             onUsernameChange={setUsername}
+            onDomainChange={setSelectedDomain}
             onSubmit={handleCheckMail}
             loading={loading}
           />
 
-          <Inbox emails={emails} activeEmail={activeEmail} hasSearched={hasSearched} />
+          <Inbox
+            emails={emails}
+            activeEmail={activeEmail}
+            activeDomain={activeDomain}
+            hasSearched={hasSearched}
+          />
         </div>
       </main>
 

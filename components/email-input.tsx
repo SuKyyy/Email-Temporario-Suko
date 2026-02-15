@@ -1,15 +1,33 @@
 "use client"
 
-import { Loader2 } from "lucide-react"
+import { ChevronDown, Loader2 } from "lucide-react"
+
+export const DOMAINS = [
+  "@sukospot.shop",
+  "@sukodocursor.shop",
+  "@sukoultra.shop",
+  "@sukov0dev.shop",
+] as const
+
+export type Domain = (typeof DOMAINS)[number]
 
 interface EmailInputProps {
   username: string
+  selectedDomain: Domain
   onUsernameChange: (value: string) => void
+  onDomainChange: (value: Domain) => void
   onSubmit: () => void
   loading: boolean
 }
 
-export function EmailInput({ username, onUsernameChange, onSubmit, loading }: EmailInputProps) {
+export function EmailInput({
+  username,
+  selectedDomain,
+  onUsernameChange,
+  onDomainChange,
+  onSubmit,
+  loading,
+}: EmailInputProps) {
   return (
     <div className="rounded-xl border border-border bg-card p-6 shadow-lg">
       <h2 className="mb-1 text-xl font-bold text-card-foreground">Access Your Mailbox</h2>
@@ -27,12 +45,24 @@ export function EmailInput({ username, onUsernameChange, onSubmit, loading }: Em
               if (e.key === "Enter" && username.trim()) onSubmit()
             }}
             placeholder="Enter your desired email address"
-            className="flex-1 bg-transparent px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
+            className="min-w-0 flex-1 bg-transparent px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
             aria-label="Email username"
           />
-          <span className="shrink-0 border-l border-border bg-muted px-3 py-3 text-xs font-medium text-muted-foreground">
-            @sukospot.shop
-          </span>
+          <div className="relative shrink-0 border-l border-border bg-muted">
+            <select
+              value={selectedDomain}
+              onChange={(e) => onDomainChange(e.target.value as Domain)}
+              className="appearance-none bg-transparent py-3 pl-3 pr-8 text-xs font-medium text-muted-foreground focus:outline-none"
+              aria-label="Select email domain"
+            >
+              {DOMAINS.map((domain) => (
+                <option key={domain} value={domain} className="bg-card text-foreground">
+                  {domain}
+                </option>
+              ))}
+            </select>
+            <ChevronDown className="pointer-events-none absolute right-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+          </div>
         </div>
 
         <button

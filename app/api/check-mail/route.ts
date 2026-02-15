@@ -46,6 +46,7 @@ const mockEmails: Record<string, MockEmail[]> = {
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
   const user = searchParams.get("user")
+  const domain = searchParams.get("domain") || "@sukospot.shop"
 
   if (!user) {
     return NextResponse.json({ error: "User parameter is required" }, { status: 400 })
@@ -56,5 +57,5 @@ export async function GET(request: NextRequest) {
 
   const emails = mockEmails[user.toLowerCase()] || []
 
-  return NextResponse.json({ emails, user })
+  return NextResponse.json({ emails, user, domain })
 }
