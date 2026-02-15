@@ -56,29 +56,41 @@ function formatRelativeTime(date: Date): string {
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
   const user = searchParams.get("user")
-  const domain = searchParams.get("domain") as SupportedDomain | null
+  const rawDomain = searchParams.get("domain")
 
-  if (!user || !domain) {
+  console.log("[v0] Raw query params - user:", user, "domain:", rawDomain)
+
+  if (!user || !rawDomain) {
     return NextResponse.json(
       { error: "Both 'user' and 'domain' parameters are required" },
       { status: 400 }
     )
   }
 
-  if (!SUPPORTED_DOMAINS.includes(domain)) {
-    return NextResponse.json({ error: "Unsupported domain" }, { status: 400 })
+  // Normalize domain: ensure it starts with "@" whether passed as "@sukospot.shop" or "sukospot.shop"
+  const normalizedDomain = (rawDomain.startsWith("@") ? rawDomain : `@${rawDomain}`) as SupportedDomain
+
+  console.log("[v0] Normalized domain:", normalizedDomain)
+
+  if (!SUPPORTED_DOMAINS.includes(normalizedDomain)) {
+    console.log("[v0] Domain not in supported list. Supported:", SUPPORTED_DOMAINS)
+    return NextResponse.json({ error: `Unsupported domain: ${normalizedDomain}` }, { status: 400 })
   }
 
-  const credentials = getCredentials(domain)
+  const credentials = getCredentials(normalizedDomain)
+
+  console.log("[v0] Credentials lookup for", normalizedDomain, "- user env:", credentials?.user ? "(set)" : "(EMPTY)", "- pass env:", credentials?.password ? "(set)" : "(EMPTY)")
+
   if (!credentials || !credentials.user || !credentials.password) {
+    console.log("[v0] Missing credentials. Check that env vars are set for domain:", normalizedDomain)
     return NextResponse.json(
-      { error: "Email credentials are not configured for this domain" },
+      { error: `Email credentials are not configured for ${normalizedDomain}. Please set the environment variables.` },
       { status: 500 }
     )
   }
 
   const imapHost = process.env.IMAP_HOST || "imap.titan.email"
-  const fullAddress = `${user}${domain}`
+  const fullAddress = `${user}${normalizedDomain}`
 
   let connection: Awaited<ReturnType<typeof imapSimple.connect>> | null = null
 
@@ -143,7 +155,7 @@ export async function GET(request: NextRequest) {
       })
     )
 
-    return NextResponse.json({ emails, user, domain })
+    return NextResponse.json({ emails, user, domain: normalizedDomain })
   } catch (err) {
     console.error("IMAP connection error:", err)
     return NextResponse.json(
