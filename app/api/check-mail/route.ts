@@ -159,7 +159,16 @@ export async function GET(request: NextRequest) {
       })
     )
 
-    return NextResponse.json({ emails, user, domain: normalizedDomain })
+    return NextResponse.json(
+      { emails, user, domain: normalizedDomain },
+      {
+        headers: {
+          "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+          "Pragma": "no-cache",
+          "Expires": "0",
+        },
+      }
+    )
   } catch (err: unknown) {
     const errorMessage = err instanceof Error ? err.message : String(err)
     const errorStack = err instanceof Error ? err.stack : undefined
@@ -168,7 +177,14 @@ export async function GET(request: NextRequest) {
     console.error("[v0] IMAP full error object:", JSON.stringify(err, Object.getOwnPropertyNames(err as object), 2))
     return NextResponse.json(
       { error: `Erro ao conectar. Verifique o email e tente novamente. (${errorMessage})` },
-      { status: 500 }
+      {
+        status: 500,
+        headers: {
+          "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+          "Pragma": "no-cache",
+          "Expires": "0",
+        },
+      }
     )
   } finally {
     if (connection) {

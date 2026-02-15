@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { ChevronDown, Clock, Mail, MailOpen, User } from "lucide-react"
+import { ChevronDown, Clock, Mail, MailOpen, RefreshCw, User } from "lucide-react"
 
 export interface Email {
   id: string
@@ -16,6 +16,9 @@ interface InboxProps {
   activeEmail: string | null
   activeDomain: string | null
   hasSearched: boolean
+  isRefreshing: boolean
+  countdown: number
+  onRefresh: () => void
 }
 
 function EmptyState({ hasSearched }: { hasSearched: boolean }) {
@@ -81,10 +84,10 @@ function EmailItem({ email }: { email: Email }) {
   )
 }
 
-export function Inbox({ emails, activeEmail, activeDomain, hasSearched }: InboxProps) {
+export function Inbox({ emails, activeEmail, activeDomain, hasSearched, isRefreshing, countdown, onRefresh }: InboxProps) {
   return (
     <div className="overflow-hidden rounded-xl border border-border bg-card shadow-lg">
-      <div className="flex items-center justify-between border-b border-border px-5 py-3">
+      <div className="flex items-center gap-3 border-b border-border px-5 py-3">
         <h3 className="text-sm font-semibold text-card-foreground">Caixa de Entrada</h3>
         {activeEmail && activeDomain && (
           <span className="rounded-full bg-secondary px-3 py-0.5 font-mono text-xs text-muted-foreground">
@@ -95,6 +98,26 @@ export function Inbox({ emails, activeEmail, activeDomain, hasSearched }: InboxP
           <span className="flex h-5 w-5 items-center justify-center rounded-full bg-accent text-xs font-bold text-accent-foreground">
             {emails.length}
           </span>
+        )}
+
+        {activeEmail && (
+          <div className="ml-auto flex items-center gap-2">
+            <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <span className="relative flex h-2 w-2">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-accent opacity-75" />
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-accent" />
+              </span>
+              {isRefreshing ? "Atualizando..." : `Atualiza em ${countdown}s`}
+            </span>
+            <button
+              onClick={onRefresh}
+              disabled={isRefreshing}
+              className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground disabled:opacity-50"
+              aria-label="Atualizar caixa de entrada"
+            >
+              <RefreshCw className={`h-3.5 w-3.5 ${isRefreshing ? "animate-spin" : ""}`} />
+            </button>
+          </div>
         )}
       </div>
 
