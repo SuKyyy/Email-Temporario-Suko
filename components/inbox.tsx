@@ -17,7 +17,7 @@ interface InboxProps {
   activeDomain: string | null
   hasSearched: boolean
   isRefreshing: boolean
-  countdown: number
+  statusMessage: string | null
   onRefresh: () => void
 }
 
@@ -84,7 +84,7 @@ function EmailItem({ email }: { email: Email }) {
   )
 }
 
-export function Inbox({ emails, activeEmail, activeDomain, hasSearched, isRefreshing, countdown, onRefresh }: InboxProps) {
+export function Inbox({ emails, activeEmail, activeDomain, hasSearched, isRefreshing, statusMessage, onRefresh }: InboxProps) {
   return (
     <div className="overflow-hidden rounded-xl border border-border bg-card shadow-lg">
       <div className="flex items-center gap-3 border-b border-border px-5 py-3">
@@ -101,14 +101,10 @@ export function Inbox({ emails, activeEmail, activeDomain, hasSearched, isRefres
         )}
 
         {activeEmail && (
-          <div className="ml-auto flex items-center gap-2">
-            <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <span className="relative flex h-2 w-2">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-accent opacity-75" />
-                <span className="relative inline-flex h-2 w-2 rounded-full bg-accent" />
-              </span>
-              {isRefreshing ? "Atualizando..." : `Atualiza em ${countdown}s`}
-            </span>
+          <div className="ml-auto flex items-center gap-3">
+            {statusMessage && (
+              <span className="text-xs text-muted-foreground">{statusMessage}</span>
+            )}
             <button
               onClick={onRefresh}
               disabled={isRefreshing}

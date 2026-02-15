@@ -123,8 +123,8 @@ export async function GET(request: NextRequest) {
 
     const messages = await connection.search(searchCriteria, fetchOptions)
 
-    // Take the last 10 messages (most recent)
-    const recentMessages = messages.slice(-10).reverse()
+    // Take the last 5 messages (most recent) for speed
+    const recentMessages = messages.slice(-5).reverse()
 
     const emails = await Promise.all(
       recentMessages.map(async (message, index) => {

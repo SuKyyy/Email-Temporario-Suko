@@ -1,87 +1,31 @@
 "use client"
 
-import { useState, useCallback, useEffect, useRef } from "react"
-import useSWR from "swr"
+import { useState, useCallback } from "react"
 import { SiteHeader } from "@/components/site-header"
 import { EmailInput, SUPPORTED_DOMAINS } from "@/components/email-input"
 import { Inbox, type Email } from "@/components/inbox"
 
-const POLL_INTERVAL = 5
-
-interface MailApiResponse {
-  emails: Email[]
-  user: string
-  domain: string
-  error?: string
-}
-
-const fetcher = async (url: string): Promise<MailApiResponse> => {
-  const res = await fetch(url)
-  const data = await res.json()
-  if (!res.ok) {
-    throw new Error(data.error || "Erro ao buscar emails. Tente novamente.")
-  }
-  return data
-}
-
 export default function Page() {
   const [email, setEmail] = useState("")
   const [error, setError] = useState<string | null>(null)
+  const [emails, setEmails] = useState<Email[]>([])
   const [loading, setLoading] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
   const [activeUser, setActiveUser] = useState<string | null>(null)
   const [activeDomain, setActiveDomain] = useState<string | null>(null)
   const [hasSearched, setHasSearched] = useState(false)
-  const [countdown, setCountdown] = useState(POLL_INTERVAL)
-  const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const [statusMessage, setStatusMessage] = useState<string | null>(null)
 
-  // SWR key: only fetch when we have an active user+domain
-  const swrKey =
-    activeUser && activeDomain
-      ? `/api/check-mail?user=${encodeURIComponent(activeUser)}&domain=${encodeURIComponent(activeDomain)}`
-      : null
-
-  const { data, error: swrError, isValidating, mutate } = useSWR<MailApiResponse>(
-    swrKey,
-    fetcher,
-    {
-      refreshInterval: POLL_INTERVAL * 1000,
-      revalidateOnFocus: false,
-      dedupingInterval: 2000,
+  const fetchEmails = useCallback(async (user: string, domain: string) => {
+    const res = await fetch(
+      `/api/check-mail?user=${encodeURIComponent(user)}&domain=${encodeURIComponent(domain)}`
+    )
+    const data = await res.json()
+    if (!res.ok) {
+      throw new Error(data.error || "Erro ao buscar emails. Tente novamente.")
     }
-  )
-
-  // Countdown timer that resets every POLL_INTERVAL seconds
-  useEffect(() => {
-    if (!swrKey) {
-      setCountdown(POLL_INTERVAL)
-      return
-    }
-
-    // Reset countdown
-    setCountdown(POLL_INTERVAL)
-
-    if (countdownRef.current) clearInterval(countdownRef.current)
-
-    countdownRef.current = setInterval(() => {
-      setCountdown((prev) => {
-        if (prev <= 1) return POLL_INTERVAL
-        return prev - 1
-      })
-    }, 1000)
-
-    return () => {
-      if (countdownRef.current) clearInterval(countdownRef.current)
-    }
-  }, [swrKey, data])
-
-  // Surface SWR errors to the error state
-  useEffect(() => {
-    if (swrError) {
-      setError(swrError.message)
-    }
-  }, [swrError])
-
-  const emails: Email[] = data?.emails || []
+    return data.emails as Email[]
+  }, [])
 
   const handleCheckMail = useCallback(async () => {
     const trimmed = email.trim()
@@ -111,26 +55,40 @@ export default function Page() {
     setError(null)
     setLoading(true)
     setHasSearched(true)
-
-    // Set the active user/domain so SWR starts fetching
-    setActiveUser(user)
-    setActiveDomain(domain)
+    setStatusMessage(null)
 
     try {
-      // First fetch immediately via SWR mutate
-      await mutate()
-    } catch {
-      // SWR error handler above will catch this
+      const result = await fetchEmails(user, domain)
+      setEmails(result)
+      setActiveUser(user)
+      setActiveDomain(domain)
+      setStatusMessage("Caixa de entrada atualizada")
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erro ao buscar emails.")
+      setEmails([])
     } finally {
       setLoading(false)
+      setTimeout(() => setStatusMessage(null), 3000)
     }
-  }, [email, mutate])
+  }, [email, fetchEmails])
 
   const handleManualRefresh = useCallback(async () => {
-    if (!swrKey) return
-    setCountdown(POLL_INTERVAL)
-    await mutate()
-  }, [swrKey, mutate])
+    if (!activeUser || !activeDomain) return
+
+    setRefreshing(true)
+    setStatusMessage("Verificando novos emails...")
+
+    try {
+      const result = await fetchEmails(activeUser, activeDomain)
+      setEmails(result)
+      setStatusMessage("Caixa de entrada atualizada")
+    } catch (err) {
+      setStatusMessage(err instanceof Error ? err.message : "Erro ao atualizar.")
+    } finally {
+      setRefreshing(false)
+      setTimeout(() => setStatusMessage(null), 3000)
+    }
+  }, [activeUser, activeDomain, fetchEmails])
 
   const handleEmailChange = useCallback((value: string) => {
     setEmail(value)
@@ -165,8 +123,8 @@ export default function Page() {
             activeEmail={activeUser}
             activeDomain={activeDomain}
             hasSearched={hasSearched}
-            isRefreshing={isValidating}
-            countdown={countdown}
+            isRefreshing={refreshing}
+            statusMessage={statusMessage}
             onRefresh={handleManualRefresh}
           />
         </div>
