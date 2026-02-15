@@ -123,12 +123,8 @@ export async function GET(request: NextRequest) {
 
     const messages = await connection.search(searchCriteria, fetchOptions)
 
-    // Close IMAP immediately after fetching to free resources
-    connection.end()
-    connection = null
-
-    // Take the last 3 messages only for near-instant response
-    const recentMessages = messages.slice(-3).reverse()
+    // Take the last 10 messages (safe against spam bursts)
+    const recentMessages = messages.slice(-10).reverse()
 
     const emails = await Promise.all(
       recentMessages.map(async (message, index) => {
@@ -162,6 +158,48 @@ export async function GET(request: NextRequest) {
         }
       })
     )
+
+    // --- Automatic Cleanup: delete messages older than 30 minutes ---
+    try {
+      const thirtyMinAgo = new Date(Date.now() - 30 * 60 * 1000)
+      // IMAP BEFORE date uses "DD-Mon-YYYY" format and matches dates strictly before that day.
+      // For intra-day granularity, we search ALL messages and filter by parsed date instead.
+      const allCriteria = [["TO", fullAddress]]
+      const headerFetch = { bodies: ["HEADER"], markSeen: false }
+
+      const allMessages = await connection.search(allCriteria, headerFetch)
+
+      const uidsToDelete: number[] = []
+      for (const msg of allMessages) {
+        const header = msg.parts.find((p: { which: string }) => p.which === "HEADER")
+        const dateHeader = header?.body?.date?.[0]
+        if (dateHeader) {
+          const msgDate = new Date(dateHeader)
+          if (msgDate.getTime() < thirtyMinAgo.getTime()) {
+            uidsToDelete.push(msg.attributes.uid)
+          }
+        }
+      }
+
+      if (uidsToDelete.length > 0) {
+        console.log(`[v0] Cleanup: deleting ${uidsToDelete.length} messages older than 30 min`)
+        await connection.addFlags(uidsToDelete, "\\Deleted")
+        await new Promise<void>((resolve, reject) => {
+          connection!.imap.expunge((err: Error | null) => {
+            if (err) reject(err)
+            else resolve()
+          })
+        })
+        console.log("[v0] Cleanup: expunge complete")
+      }
+    } catch (cleanupErr) {
+      // Cleanup failure must NOT block the user response
+      console.error("[v0] Cleanup failed (non-blocking):", cleanupErr instanceof Error ? cleanupErr.message : cleanupErr)
+    }
+
+    // Close connection after cleanup is done
+    connection.end()
+    connection = null
 
     return NextResponse.json(
       { emails, user, domain: normalizedDomain },
