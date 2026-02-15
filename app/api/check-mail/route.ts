@@ -123,8 +123,12 @@ export async function GET(request: NextRequest) {
 
     const messages = await connection.search(searchCriteria, fetchOptions)
 
-    // Take the last 5 messages (most recent) for speed
-    const recentMessages = messages.slice(-5).reverse()
+    // Close IMAP immediately after fetching to free resources
+    connection.end()
+    connection = null
+
+    // Take the last 3 messages only for near-instant response
+    const recentMessages = messages.slice(-3).reverse()
 
     const emails = await Promise.all(
       recentMessages.map(async (message, index) => {

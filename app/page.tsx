@@ -59,16 +59,16 @@ export default function Page() {
 
     try {
       const result = await fetchEmails(user, domain)
+      setLoading(false)
       setEmails(result)
       setActiveUser(user)
       setActiveDomain(domain)
       setStatusMessage("Caixa de entrada atualizada")
+      setTimeout(() => setStatusMessage(null), 3000)
     } catch (err) {
+      setLoading(false)
       setError(err instanceof Error ? err.message : "Erro ao buscar emails.")
       setEmails([])
-    } finally {
-      setLoading(false)
-      setTimeout(() => setStatusMessage(null), 3000)
     }
   }, [email, fetchEmails])
 
@@ -80,13 +80,14 @@ export default function Page() {
 
     try {
       const result = await fetchEmails(activeUser, activeDomain)
+      setRefreshing(false)
       setEmails(result)
       setStatusMessage("Caixa de entrada atualizada")
-    } catch (err) {
-      setStatusMessage(err instanceof Error ? err.message : "Erro ao atualizar.")
-    } finally {
-      setRefreshing(false)
       setTimeout(() => setStatusMessage(null), 3000)
+    } catch (err) {
+      setRefreshing(false)
+      setStatusMessage(err instanceof Error ? err.message : "Erro ao atualizar.")
+      setTimeout(() => setStatusMessage(null), 5000)
     }
   }, [activeUser, activeDomain, fetchEmails])
 

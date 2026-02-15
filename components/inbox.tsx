@@ -118,6 +118,15 @@ export function Inbox({ emails, activeEmail, activeDomain, hasSearched, isRefres
         )}
       </div>
 
+      {activeEmail && (
+        <div className="flex items-start gap-2.5 border-b border-border bg-amber-950/30 px-5 py-3">
+          <span className="mt-0.5 shrink-0 text-sm text-amber-400" aria-hidden="true">&#9888;</span>
+          <p className="text-xs leading-relaxed text-amber-200/80">
+            Emails podem levar de 15 a 30 segundos para chegar devido ao processamento do servidor. Se nao encontrar, aguarde um momento e clique em Atualizar.
+          </p>
+        </div>
+      )}
+
       {emails.length === 0 ? (
         <EmptyState hasSearched={hasSearched} />
       ) : (
