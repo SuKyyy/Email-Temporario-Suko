@@ -4,10 +4,10 @@ import { useState } from "react"
 import { ChevronDown, Globe } from "lucide-react"
 
 const languages = [
+  { code: "pt", label: "Portugues" },
   { code: "en", label: "English" },
-  { code: "de", label: "Deutsch" },
-  { code: "fr", label: "Français" },
-  { code: "es", label: "Español" },
+  { code: "es", label: "Espanol" },
+  { code: "fr", label: "Francais" },
 ]
 
 export function SiteHeader() {

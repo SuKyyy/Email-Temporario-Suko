@@ -7,8 +7,8 @@ const _inter = Inter({ subsets: ['latin'], variable: '--font-inter' })
 const _spaceMono = Space_Mono({ weight: ['400', '700'], subsets: ['latin'], variable: '--font-space-mono' })
 
 export const metadata: Metadata = {
-  title: 'SuKo Shop - Temporary Email Inbox',
-  description: 'Access your temporary email mailbox at sukospot.shop',
+  title: 'SuKo Shop - Email Temporario',
+  description: 'Acesse sua caixa de entrada temporaria nos dominios SuKo',
 }
 
 export const viewport: Viewport = {
@@ -21,7 +21,7 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="pt-BR" suppressHydrationWarning>
       <body suppressHydrationWarning className={`${_inter.variable} ${_spaceMono.variable} font-sans antialiased`}>{children}</body>
     </html>
   )

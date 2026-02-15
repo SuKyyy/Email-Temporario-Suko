@@ -43,14 +43,14 @@ function formatRelativeTime(date: Date): string {
   const diffMs = now - date.getTime()
   const diffMin = Math.floor(diffMs / 60000)
 
-  if (diffMin < 1) return "Just now"
-  if (diffMin < 60) return `${diffMin} min ago`
+  if (diffMin < 1) return "Agora mesmo"
+  if (diffMin < 60) return `${diffMin} min atras`
 
   const diffHours = Math.floor(diffMin / 60)
-  if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? "s" : ""} ago`
+  if (diffHours < 24) return `${diffHours} hora${diffHours > 1 ? "s" : ""} atras`
 
   const diffDays = Math.floor(diffHours / 24)
-  return `${diffDays} day${diffDays > 1 ? "s" : ""} ago`
+  return `${diffDays} dia${diffDays > 1 ? "s" : ""} atras`
 }
 
 export async function GET(request: NextRequest) {
@@ -62,7 +62,7 @@ export async function GET(request: NextRequest) {
 
   if (!user || !rawDomain) {
     return NextResponse.json(
-      { error: "Both 'user' and 'domain' parameters are required" },
+      { error: "Parametros 'user' e 'domain' sao obrigatorios" },
       { status: 400 }
     )
   }
@@ -74,7 +74,7 @@ export async function GET(request: NextRequest) {
 
   if (!SUPPORTED_DOMAINS.includes(normalizedDomain)) {
     console.log("[v0] Domain not in supported list. Supported:", SUPPORTED_DOMAINS)
-    return NextResponse.json({ error: `Unsupported domain: ${normalizedDomain}` }, { status: 400 })
+    return NextResponse.json({ error: `Dominio nao suportado: ${normalizedDomain}` }, { status: 400 })
   }
 
   const credentials = getCredentials(normalizedDomain)
@@ -84,7 +84,7 @@ export async function GET(request: NextRequest) {
   if (!credentials || !credentials.user || !credentials.password) {
     console.log("[v0] Missing credentials. Check that env vars are set for domain:", normalizedDomain)
     return NextResponse.json(
-      { error: `Email credentials are not configured for ${normalizedDomain}. Please set the environment variables.` },
+      { error: `Dominio nao configurado no sistema: ${normalizedDomain}` },
       { status: 500 }
     )
   }
@@ -135,10 +135,10 @@ export async function GET(request: NextRequest) {
           const parsed = await simpleParser(rawEmail)
 
           const fromAddress = parsed.from?.value?.[0]
-          const fromName = fromAddress?.name || fromAddress?.address || "Unknown Sender"
-          const subject = parsed.subject || "(No Subject)"
-          const date = parsed.date ? formatRelativeTime(parsed.date) : "Unknown"
-          const body = parsed.html || parsed.textAsHtml || `<p>${parsed.text || "No content"}</p>`
+          const fromName = fromAddress?.name || fromAddress?.address || "Remetente desconhecido"
+          const subject = parsed.subject || "(Sem assunto)"
+          const date = parsed.date ? formatRelativeTime(parsed.date) : "Desconhecido"
+          const body = parsed.html || parsed.textAsHtml || `<p>${parsed.text || "Sem conteudo"}</p>`
 
           return {
             id: parsed.messageId || `msg-${index}`,
@@ -150,10 +150,10 @@ export async function GET(request: NextRequest) {
         } catch {
           return {
             id: `msg-${index}`,
-            from: "Unknown",
-            subject: "(Could not parse email)",
-            date: "Unknown",
-            body: "<p>This email could not be parsed.</p>",
+            from: "Desconhecido",
+            subject: "(Nao foi possivel processar o email)",
+            date: "Desconhecido",
+            body: "<p>Este email nao pode ser processado.</p>",
           }
         }
       })
@@ -167,7 +167,7 @@ export async function GET(request: NextRequest) {
     console.error("[v0] IMAP error stack:", errorStack)
     console.error("[v0] IMAP full error object:", JSON.stringify(err, Object.getOwnPropertyNames(err as object), 2))
     return NextResponse.json(
-      { error: `IMAP Error: ${errorMessage}` },
+      { error: `Erro ao conectar. Verifique o email e tente novamente. (${errorMessage})` },
       { status: 500 }
     )
   } finally {

@@ -25,12 +25,12 @@ function EmptyState({ hasSearched }: { hasSearched: boolean }) {
         <Mail className="h-10 w-10 text-muted-foreground" />
       </div>
       <h3 className="mb-1 text-lg font-semibold text-card-foreground">
-        {hasSearched ? "No Emails Found" : "No Email Address Selected"}
+        {hasSearched ? "Nenhum email encontrado" : "Nenhum email selecionado"}
       </h3>
       <p className="max-w-xs text-sm text-muted-foreground">
         {hasSearched
-          ? "This inbox is empty. New messages will appear here automatically."
-          : "Enter an email address above and click 'Access Mailbox' to check your inbox."}
+          ? "Sua caixa de entrada esta vazia. Novas mensagens aparecerao aqui automaticamente."
+          : "Digite um email acima e clique em 'Acessar Email' para verificar sua caixa de entrada."}
       </p>
     </div>
   )
@@ -85,7 +85,7 @@ export function Inbox({ emails, activeEmail, activeDomain, hasSearched }: InboxP
   return (
     <div className="overflow-hidden rounded-xl border border-border bg-card shadow-lg">
       <div className="flex items-center justify-between border-b border-border px-5 py-3">
-        <h3 className="text-sm font-semibold text-card-foreground">Inbox</h3>
+        <h3 className="text-sm font-semibold text-card-foreground">Caixa de Entrada</h3>
         {activeEmail && activeDomain && (
           <span className="rounded-full bg-secondary px-3 py-0.5 font-mono text-xs text-muted-foreground">
             {activeEmail}{activeDomain}

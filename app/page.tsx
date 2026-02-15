@@ -21,7 +21,7 @@ export default function Page() {
     // Validate "@" presence
     const atIndex = trimmed.lastIndexOf("@")
     if (atIndex === -1) {
-      setError("Invalid email format")
+      setError("Formato de email invalido. Use @dominio.shop")
       return
     }
 
@@ -30,14 +30,14 @@ export default function Page() {
 
     // Validate user part is not empty
     if (!user) {
-      setError("Please enter a username before the @ symbol")
+      setError("Digite um nome de usuario antes do @")
       return
     }
 
     // Validate domain against supported list
     if (!SUPPORTED_DOMAINS.includes(domain as (typeof SUPPORTED_DOMAINS)[number])) {
       setError(
-        `Unsupported domain. Supported: ${SUPPORTED_DOMAINS.join(", ")}`
+        `Dominio nao suportado. Disponiveis: ${SUPPORTED_DOMAINS.join(", ")}`
       )
       return
     }
@@ -53,7 +53,7 @@ export default function Page() {
       const data = await response.json()
 
       if (!response.ok) {
-        setError(data.error || "Failed to fetch emails. Please try again.")
+        setError(data.error || "Erro ao buscar emails. Tente novamente.")
         setEmails([])
         return
       }
@@ -62,7 +62,7 @@ export default function Page() {
       setActiveEmail(user)
       setActiveDomain(domain)
     } catch {
-      setError("Network error. Please check your connection and try again.")
+      setError("Erro de conexao. Verifique sua internet e tente novamente.")
       setEmails([])
     } finally {
       setLoading(false)
@@ -82,10 +82,10 @@ export default function Page() {
         <div className="w-full max-w-2xl space-y-6">
           <div className="text-center">
             <h1 className="text-balance text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
-              Temporary Email Inbox
+              Email Temporario SuKo
             </h1>
             <p className="mt-2 text-sm text-muted-foreground">
-              Receive emails instantly at your temporary address
+              Receba emails instantaneamente nos seus dominios.
             </p>
           </div>
 
@@ -107,7 +107,7 @@ export default function Page() {
       </main>
 
       <footer className="border-t border-border py-4 text-center text-xs text-muted-foreground">
-        <p>SuKo Shop &middot; Temporary email service &middot; All messages are automatically deleted after 24 hours</p>
+        <p>SuKo Shop &middot; Servico de email temporario &middot; Todas as mensagens sao excluidas automaticamente apos 24 horas</p>
       </footer>
     </div>
   )

@@ -26,9 +26,9 @@ export function EmailInput({
 }: EmailInputProps) {
   return (
     <div className="rounded-xl border border-border bg-card p-6 shadow-lg">
-      <h2 className="mb-1 text-xl font-bold text-card-foreground">Access Your Mailbox</h2>
+      <h2 className="mb-1 text-xl font-bold text-card-foreground">Acesse sua Caixa de Entrada</h2>
       <p className="mb-5 text-sm text-muted-foreground">
-        Enter your full email address to check your inbox
+        Digite seu email completo para verificar sua caixa de entrada
       </p>
 
       <div className="flex flex-col gap-3 sm:flex-row">
@@ -40,11 +40,11 @@ export function EmailInput({
             onKeyDown={(e) => {
               if (e.key === "Enter" && email.trim()) onSubmit()
             }}
-            placeholder="Enter full email address (e.g., user@sukospot.shop)"
+            placeholder="Digite seu email completo (ex: kratos@sukospot.shop)"
             className={`w-full rounded-lg border bg-secondary px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 ${
               error ? "border-destructive" : "border-border"
             }`}
-            aria-label="Full email address"
+            aria-label="Endereco de email completo"
             aria-invalid={!!error}
             aria-describedby={error ? "email-error" : undefined}
           />
@@ -59,15 +59,15 @@ export function EmailInput({
           onClick={onSubmit}
           disabled={!email.trim() || loading}
           className="flex shrink-0 items-center justify-center gap-2 rounded-lg bg-accent px-6 py-3 text-sm font-semibold text-accent-foreground transition-all hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
-          aria-label="Access mailbox"
+          aria-label="Acessar email"
         >
           {loading ? (
             <>
               <Loader2 className="h-4 w-4 animate-spin" />
-              Checking...
+              Carregando...
             </>
           ) : (
-            "Access Mailbox"
+            "Acessar Email"
           )}
         </button>
       </div>
