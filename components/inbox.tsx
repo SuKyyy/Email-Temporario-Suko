@@ -112,10 +112,11 @@ export function Inbox({ emails, activeEmail, activeDomain, hasSearched, isRefres
             <button
               onClick={onRefresh}
               disabled={isRefreshing}
-              className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground disabled:opacity-50"
+              className="flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1 text-xs text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
               aria-label="Atualizar caixa de entrada"
             >
               <RefreshCw className={`h-3.5 w-3.5 ${isRefreshing ? "animate-spin" : ""}`} />
+              <span className="hidden sm:inline">{isRefreshing ? "Atualizando..." : "Atualizar"}</span>
             </button>
           </div>
         )}
