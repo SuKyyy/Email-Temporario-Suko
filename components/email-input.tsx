@@ -1,30 +1,26 @@
 "use client"
 
-import { ChevronDown, Loader2 } from "lucide-react"
+import { Loader2 } from "lucide-react"
 
-export const DOMAINS = [
+export const SUPPORTED_DOMAINS = [
   "@sukospot.shop",
   "@sukodocursor.shop",
   "@sukoultra.shop",
   "@sukov0dev.shop",
 ] as const
 
-export type Domain = (typeof DOMAINS)[number]
-
 interface EmailInputProps {
-  username: string
-  selectedDomain: Domain
-  onUsernameChange: (value: string) => void
-  onDomainChange: (value: Domain) => void
+  email: string
+  error: string | null
+  onEmailChange: (value: string) => void
   onSubmit: () => void
   loading: boolean
 }
 
 export function EmailInput({
-  username,
-  selectedDomain,
-  onUsernameChange,
-  onDomainChange,
+  email,
+  error,
+  onEmailChange,
   onSubmit,
   loading,
 }: EmailInputProps) {
@@ -32,43 +28,37 @@ export function EmailInput({
     <div className="rounded-xl border border-border bg-card p-6 shadow-lg">
       <h2 className="mb-1 text-xl font-bold text-card-foreground">Access Your Mailbox</h2>
       <p className="mb-5 text-sm text-muted-foreground">
-        Enter your desired email address to check your inbox
+        Enter your full email address to check your inbox
       </p>
 
       <div className="flex flex-col gap-3 sm:flex-row">
-        <div className="relative flex flex-1 items-center overflow-hidden rounded-lg border border-border bg-secondary">
+        <div className="flex flex-1 flex-col gap-1.5">
           <input
-            type="text"
-            value={username}
-            onChange={(e) => onUsernameChange(e.target.value)}
+            type="email"
+            value={email}
+            onChange={(e) => onEmailChange(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === "Enter" && username.trim()) onSubmit()
+              if (e.key === "Enter" && email.trim()) onSubmit()
             }}
-            placeholder="Enter your desired email address"
-            className="min-w-0 flex-1 bg-transparent px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
-            aria-label="Email username"
+            placeholder="Enter full email address (e.g., user@sukospot.shop)"
+            className={`w-full rounded-lg border bg-secondary px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 ${
+              error ? "border-destructive" : "border-border"
+            }`}
+            aria-label="Full email address"
+            aria-invalid={!!error}
+            aria-describedby={error ? "email-error" : undefined}
           />
-          <div className="relative shrink-0 border-l border-border bg-muted">
-            <select
-              value={selectedDomain}
-              onChange={(e) => onDomainChange(e.target.value as Domain)}
-              className="appearance-none bg-transparent py-3 pl-3 pr-8 text-xs font-medium text-muted-foreground focus:outline-none"
-              aria-label="Select email domain"
-            >
-              {DOMAINS.map((domain) => (
-                <option key={domain} value={domain} className="bg-card text-foreground">
-                  {domain}
-                </option>
-              ))}
-            </select>
-            <ChevronDown className="pointer-events-none absolute right-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
-          </div>
+          {error && (
+            <p id="email-error" className="text-xs text-destructive" role="alert">
+              {error}
+            </p>
+          )}
         </div>
 
         <button
           onClick={onSubmit}
-          disabled={!username.trim() || loading}
-          className="flex items-center justify-center gap-2 rounded-lg bg-accent px-6 py-3 text-sm font-semibold text-accent-foreground transition-all hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
+          disabled={!email.trim() || loading}
+          className="flex shrink-0 items-center justify-center gap-2 rounded-lg bg-accent px-6 py-3 text-sm font-semibold text-accent-foreground transition-all hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
           aria-label="Access mailbox"
         >
           {loading ? (

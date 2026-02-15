@@ -2,12 +2,12 @@
 
 import { useState, useCallback } from "react"
 import { SiteHeader } from "@/components/site-header"
-import { EmailInput, DOMAINS, type Domain } from "@/components/email-input"
+import { EmailInput, SUPPORTED_DOMAINS } from "@/components/email-input"
 import { Inbox, type Email } from "@/components/inbox"
 
 export default function Page() {
-  const [username, setUsername] = useState("")
-  const [selectedDomain, setSelectedDomain] = useState<Domain>(DOMAINS[0])
+  const [email, setEmail] = useState("")
+  const [error, setError] = useState<string | null>(null)
   const [emails, setEmails] = useState<Email[]>([])
   const [loading, setLoading] = useState(false)
   const [activeEmail, setActiveEmail] = useState<string | null>(null)
@@ -15,25 +15,56 @@ export default function Page() {
   const [hasSearched, setHasSearched] = useState(false)
 
   const handleCheckMail = useCallback(async () => {
-    if (!username.trim()) return
+    const trimmed = email.trim()
+    if (!trimmed) return
 
+    // Validate "@" presence
+    if (!trimmed.includes("@")) {
+      setError("Please enter a valid email address")
+      return
+    }
+
+    const atIndex = trimmed.indexOf("@")
+    const user = trimmed.slice(0, atIndex)
+    const domain = trimmed.slice(atIndex) // includes the "@"
+
+    // Validate user part is not empty
+    if (!user) {
+      setError("Please enter a username before the @ symbol")
+      return
+    }
+
+    // Validate domain against supported list
+    if (!SUPPORTED_DOMAINS.includes(domain as (typeof SUPPORTED_DOMAINS)[number])) {
+      setError(
+        `Unsupported domain. Supported domains: ${SUPPORTED_DOMAINS.join(", ")}`
+      )
+      return
+    }
+
+    setError(null)
     setLoading(true)
     setHasSearched(true)
 
     try {
       const response = await fetch(
-        `/api/check-mail?user=${encodeURIComponent(username.trim())}&domain=${encodeURIComponent(selectedDomain)}`
+        `/api/check-mail?user=${encodeURIComponent(user)}&domain=${encodeURIComponent(domain)}`
       )
       const data = await response.json()
       setEmails(data.emails || [])
-      setActiveEmail(username.trim())
-      setActiveDomain(selectedDomain)
+      setActiveEmail(user)
+      setActiveDomain(domain)
     } catch {
       setEmails([])
     } finally {
       setLoading(false)
     }
-  }, [username, selectedDomain])
+  }, [email])
+
+  const handleEmailChange = useCallback((value: string) => {
+    setEmail(value)
+    if (error) setError(null)
+  }, [error])
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -51,10 +82,9 @@ export default function Page() {
           </div>
 
           <EmailInput
-            username={username}
-            selectedDomain={selectedDomain}
-            onUsernameChange={setUsername}
-            onDomainChange={setSelectedDomain}
+            email={email}
+            error={error}
+            onEmailChange={handleEmailChange}
             onSubmit={handleCheckMail}
             loading={loading}
           />
