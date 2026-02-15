@@ -19,12 +19,12 @@ export default function Page() {
     if (!trimmed) return
 
     // Validate "@" presence
-    if (!trimmed.includes("@")) {
-      setError("Please enter a valid email address")
+    const atIndex = trimmed.lastIndexOf("@")
+    if (atIndex === -1) {
+      setError("Invalid email format")
       return
     }
 
-    const atIndex = trimmed.indexOf("@")
     const user = trimmed.slice(0, atIndex)
     const domain = trimmed.slice(atIndex) // includes the "@"
 
@@ -37,7 +37,7 @@ export default function Page() {
     // Validate domain against supported list
     if (!SUPPORTED_DOMAINS.includes(domain as (typeof SUPPORTED_DOMAINS)[number])) {
       setError(
-        `Unsupported domain. Supported domains: ${SUPPORTED_DOMAINS.join(", ")}`
+        `Unsupported domain. Supported: ${SUPPORTED_DOMAINS.join(", ")}`
       )
       return
     }
@@ -51,10 +51,18 @@ export default function Page() {
         `/api/check-mail?user=${encodeURIComponent(user)}&domain=${encodeURIComponent(domain)}`
       )
       const data = await response.json()
+
+      if (!response.ok) {
+        setError(data.error || "Failed to fetch emails. Please try again.")
+        setEmails([])
+        return
+      }
+
       setEmails(data.emails || [])
       setActiveEmail(user)
       setActiveDomain(domain)
     } catch {
+      setError("Network error. Please check your connection and try again.")
       setEmails([])
     } finally {
       setLoading(false)
