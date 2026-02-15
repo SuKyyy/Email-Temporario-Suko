@@ -20,18 +20,18 @@ function getCredentials(domain: SupportedDomain): { user: string; password: stri
       }
     case "@sukodocursor.shop":
       return {
-        user: process.env.IMAP_USER_SUKODOCURSOR || "",
-        password: process.env.IMAP_PASS_SUKODOCURSOR || "",
+        user: process.env.IMAP_USER_CURSOR || "",
+        password: process.env.IMAP_PASS_CURSOR || "",
       }
     case "@sukoultra.shop":
       return {
-        user: process.env.IMAP_USER_SUKOULTRA || "",
-        password: process.env.IMAP_PASS_SUKOULTRA || "",
+        user: process.env.IMAP_USER_ULTRA || "",
+        password: process.env.IMAP_PASS_ULTRA || "",
       }
     case "@sukov0dev.shop":
       return {
-        user: process.env.IMAP_USER_SUKOV0DEV || "",
-        password: process.env.IMAP_PASS_SUKOV0DEV || "",
+        user: process.env.IMAP_USER_V0 || "",
+        password: process.env.IMAP_PASS_V0 || "",
       }
     default:
       return null

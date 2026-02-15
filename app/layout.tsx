@@ -22,7 +22,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${_inter.variable} ${_spaceMono.variable} font-sans antialiased`}>{children}</body>
+      <body suppressHydrationWarning className={`${_inter.variable} ${_spaceMono.variable} font-sans antialiased`}>{children}</body>
     </html>
   )
 }
