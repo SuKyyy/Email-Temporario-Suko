@@ -92,6 +92,8 @@ export async function GET(request: NextRequest) {
   const imapHost = process.env.IMAP_HOST || "imap.titan.email"
   const fullAddress = `${user}${normalizedDomain}`
 
+  console.log("[v0] IMAP connection attempt - host:", imapHost, "port: 993", "tls: true", "imap_user:", credentials.user, "target_address:", fullAddress)
+
   let connection: Awaited<ReturnType<typeof imapSimple.connect>> | null = null
 
   try {
@@ -107,7 +109,9 @@ export async function GET(request: NextRequest) {
       },
     }
 
+    console.log("[v0] Connecting to IMAP server...")
     connection = await imapSimple.connect(config)
+    console.log("[v0] IMAP connected successfully")
     await connection.openBox("INBOX")
 
     const searchCriteria = [["TO", fullAddress]]
@@ -156,10 +160,14 @@ export async function GET(request: NextRequest) {
     )
 
     return NextResponse.json({ emails, user, domain: normalizedDomain })
-  } catch (err) {
-    console.error("IMAP connection error:", err)
+  } catch (err: unknown) {
+    const errorMessage = err instanceof Error ? err.message : String(err)
+    const errorStack = err instanceof Error ? err.stack : undefined
+    console.error("[v0] IMAP error message:", errorMessage)
+    console.error("[v0] IMAP error stack:", errorStack)
+    console.error("[v0] IMAP full error object:", JSON.stringify(err, Object.getOwnPropertyNames(err as object), 2))
     return NextResponse.json(
-      { error: "Failed to connect to the email server. Please try again." },
+      { error: `IMAP Error: ${errorMessage}` },
       { status: 500 }
     )
   } finally {
