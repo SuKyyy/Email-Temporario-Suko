@@ -98,89 +98,103 @@ export async function GET(request: NextRequest) {
     connection = await imapSimple.connect(config)
     console.log("[v0] Connected! Opening INBOX...")
     await connection.openBox("INBOX")
-    console.log("[v0] INBOX open. Searching TO:", fullAddress)
+    // --- FETCH & FILTER STRATEGY ---
+    // Titan/HostGator IMAP SEARCH TO is unreliable for forwarded emails.
+    // Instead: fetch last 30 messages, then filter locally by TO / X-Original-To header.
+    console.log("[v0] Fetching last 30 emails from INBOX for local filtering...")
 
-    // Simple search: only filter by TO header, no date filter to avoid timezone issues
-    const searchCriteria = [["TO", fullAddress]]
+    const allCriteria = ["ALL"]
     const fetchOptions = {
       bodies: ["HEADER", ""],
       markSeen: false,
       struct: true,
     }
 
-    const messages = await connection.search(searchCriteria, fetchOptions)
-    console.log("[v0] Search returned", messages.length, "messages for", fullAddress)
+    const allMessages = await connection.search(allCriteria, fetchOptions)
+    console.log("[v0] Total messages in INBOX:", allMessages.length)
 
-    // Take the last 10 messages (safe against spam bursts)
-    const recentMessages = messages.slice(-10).reverse()
+    // Take the last 30 (most recent), then filter locally
+    const recentBatch = allMessages.slice(-30).reverse()
+    const targetLower = fullAddress.toLowerCase()
 
-    const emails = await Promise.all(
-      recentMessages.map(async (message, index) => {
-        try {
-          const allBody = message.parts.find((part: { which: string }) => part.which === "")
-          const rawEmail = allBody?.body || ""
+    // Phase 1: Parse and filter by TO header locally
+    const matchedEmails: Array<{
+      id: string
+      from: string
+      subject: string
+      date: string
+      body: string
+      attachments: Array<{ filename: string; contentType: string; size: number; content: string }>
+      uid: number
+      parsedDate: Date | null
+    }> = []
 
-          const parsed = await simpleParser(rawEmail)
+    for (let i = 0; i < recentBatch.length; i++) {
+      const message = recentBatch[i]
+      try {
+        const allBody = message.parts.find((part: { which: string }) => part.which === "")
+        const headerPart = message.parts.find((part: { which: string }) => part.which === "HEADER")
+        const rawEmail = allBody?.body || ""
 
-          const fromAddress = parsed.from?.value?.[0]
-          const fromName = fromAddress?.name || fromAddress?.address || "Remetente desconhecido"
-          const subject = parsed.subject || "(Sem assunto)"
-          const date = parsed.date ? formatRelativeTime(parsed.date) : "Desconhecido"
-          const body = parsed.html || parsed.textAsHtml || `<p>${parsed.text || "Sem conteudo"}</p>`
+        // Quick header check first: does TO or X-Original-To match?
+        const toHeader = (headerPart?.body?.to || []).join(" ").toLowerCase()
+        const xOrigTo = (headerPart?.body?.["x-original-to"] || []).join(" ").toLowerCase()
+        const deliveredTo = (headerPart?.body?.["delivered-to"] || []).join(" ").toLowerCase()
+        const ccHeader = (headerPart?.body?.cc || []).join(" ").toLowerCase()
 
-          // Extract attachments
-          const attachments = (parsed.attachments || []).map((att) => ({
-            filename: att.filename || "attachment",
-            contentType: att.contentType || "application/octet-stream",
-            size: att.size || 0,
-            content: att.content.toString("base64"),
-          }))
+        const matchesTarget =
+          toHeader.includes(targetLower) ||
+          xOrigTo.includes(targetLower) ||
+          deliveredTo.includes(targetLower) ||
+          ccHeader.includes(targetLower)
 
-          return {
-            id: parsed.messageId || `msg-${index}`,
-            from: fromName,
-            subject,
-            date,
-            body,
-            attachments,
-          }
-        } catch {
-          return {
-            id: `msg-${index}`,
-            from: "Desconhecido",
-            subject: "(Nao foi possivel processar o email)",
-            date: "Desconhecido",
-            body: "<p>Este email nao pode ser processado.</p>",
-            attachments: [],
-          }
-        }
-      })
-    )
+        if (!matchesTarget) continue
 
-    // --- Automatic Cleanup: delete messages older than 30 minutes ---
+        // Full parse only for matching messages
+        const parsed = await simpleParser(rawEmail)
+
+        const fromAddress = parsed.from?.value?.[0]
+        const fromName = fromAddress?.name || fromAddress?.address || "Remetente desconhecido"
+        const subject = parsed.subject || "(Sem assunto)"
+        const date = parsed.date ? formatRelativeTime(parsed.date) : "Desconhecido"
+        const body = parsed.html || parsed.textAsHtml || `<p>${parsed.text || "Sem conteudo"}</p>`
+
+        const attachments = (parsed.attachments || []).map((att) => ({
+          filename: att.filename || "attachment",
+          contentType: att.contentType || "application/octet-stream",
+          size: att.size || 0,
+          content: att.content.toString("base64"),
+        }))
+
+        matchedEmails.push({
+          id: parsed.messageId || `msg-${i}`,
+          from: fromName,
+          subject,
+          date,
+          body,
+          attachments,
+          uid: message.attributes.uid,
+          parsedDate: parsed.date || null,
+        })
+      } catch {
+        // Skip unparseable messages silently
+      }
+    }
+
+    console.log("[v0] Found", matchedEmails.length, "matches locally for", fullAddress)
+
+    // Take top 10 matches
+    const emails = matchedEmails.slice(0, 10).map(({ uid, parsedDate, ...email }) => email)
+
+    // --- Automatic Cleanup: delete matched messages older than 30 minutes ---
     try {
       const thirtyMinAgo = new Date(Date.now() - 30 * 60 * 1000)
-      // IMAP BEFORE date uses "DD-Mon-YYYY" format and matches dates strictly before that day.
-      // For intra-day granularity, we search ALL messages and filter by parsed date instead.
-      const allCriteria = [["TO", fullAddress]]
-      const headerFetch = { bodies: ["HEADER"], markSeen: false }
-
-      const allMessages = await connection.search(allCriteria, headerFetch)
-
-      const uidsToDelete: number[] = []
-      for (const msg of allMessages) {
-        const header = msg.parts.find((p: { which: string }) => p.which === "HEADER")
-        const dateHeader = header?.body?.date?.[0]
-        if (dateHeader) {
-          const msgDate = new Date(dateHeader)
-          if (msgDate.getTime() < thirtyMinAgo.getTime()) {
-            uidsToDelete.push(msg.attributes.uid)
-          }
-        }
-      }
+      const uidsToDelete = matchedEmails
+        .filter((e) => e.parsedDate && e.parsedDate.getTime() < thirtyMinAgo.getTime())
+        .map((e) => e.uid)
 
       if (uidsToDelete.length > 0) {
-        console.log(`[v0] Cleanup: deleting ${uidsToDelete.length} messages older than 30 min`)
+        console.log("[v0] Cleanup: deleting", uidsToDelete.length, "messages older than 30 min")
         await connection.addFlags(uidsToDelete, "\\Deleted")
         await new Promise<void>((resolve, reject) => {
           connection!.imap.expunge((err: Error | null) => {
@@ -188,14 +202,11 @@ export async function GET(request: NextRequest) {
             else resolve()
           })
         })
-        console.log("[v0] Cleanup: expunge complete")
       }
     } catch (cleanupErr) {
-      // Cleanup failure must NOT block the user response
       console.error("[v0] Cleanup failed (non-blocking):", cleanupErr instanceof Error ? cleanupErr.message : cleanupErr)
     }
 
-    // Close connection after cleanup is done
     connection.end()
     connection = null
 
