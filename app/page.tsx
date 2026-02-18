@@ -4,7 +4,7 @@ import { useState, useCallback, useEffect, useRef } from "react"
 import { toast } from "sonner"
 import { SiteHeader } from "@/components/site-header"
 import { EmailInput, ROOT_DOMAINS, isSupportedDomain } from "@/components/email-input"
-import { Inbox, type Email } from "@/components/inbox"
+import { Inbox, type Email } from "@/components/mail-inbox"
 
 const POLL_SECONDS = 10
 
