@@ -164,12 +164,12 @@ export default function Page() {
 
     setError(null)
     setLoading(true)
-    setHasSearched(true)
     setStatusMessage(null)
 
     try {
       const result = await fetchEmails(user, domain)
       setLoading(false)
+      setHasSearched(true)
       setEmails(result)
       setActiveUser(user)
       setActiveDomain(domain)
@@ -239,6 +239,7 @@ export default function Page() {
             activeEmail={activeUser}
             activeDomain={activeDomain}
             hasSearched={hasSearched}
+            isLoading={loading}
             isRefreshing={refreshing}
             isPolling={isPolling}
             statusMessage={statusMessage}

@@ -36,6 +36,7 @@ interface InboxProps {
   activeEmail: string | null
   activeDomain: string | null
   hasSearched: boolean
+  isLoading: boolean
   isRefreshing: boolean
   isPolling: boolean
   statusMessage: string | null
@@ -222,6 +223,7 @@ export function Inbox({
   activeEmail,
   activeDomain,
   hasSearched,
+  isLoading,
   isRefreshing,
   isPolling,
   statusMessage,
@@ -301,7 +303,12 @@ export function Inbox({
         </div>
       )}
 
-      {emails.length === 0 ? (
+      {isLoading ? (
+        <div className="flex flex-col items-center justify-center py-16 text-center">
+          <Loader2 className="mb-4 h-10 w-10 animate-spin text-muted-foreground" />
+          <p className="text-sm text-muted-foreground">Buscando emails...</p>
+        </div>
+      ) : emails.length === 0 ? (
         <EmptyState hasSearched={hasSearched} />
       ) : (
         <div className="divide-y divide-border">

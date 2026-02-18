@@ -54,15 +54,23 @@ export async function GET(request: NextRequest) {
   }
 
   // Central inbox credentials — all domains are forwarded here via Cloudflare Email Routing
-  const centralUser = process.env.IMAP_CENTRAL_USER ?? ""
-  const centralPass = process.env.IMAP_CENTRAL_PASS ?? ""
+  // Fallback: you can hardcode credentials here if env vars are not working
+  const FALLBACK_USER = "" // e.g. "sukoademirultra@sukoultra.shop"
+  const FALLBACK_PASS = "" // e.g. "your-password-here"
+
+  const centralUser = process.env.IMAP_CENTRAL_USER || FALLBACK_USER
+  const centralPass = process.env.IMAP_CENTRAL_PASS || FALLBACK_PASS
   const imapHost = process.env.IMAP_HOST || "imap.titan.email"
   const imapPort = parseInt(process.env.IMAP_PORT || "993", 10)
+
+  console.log("[v0] Connecting to", centralUser || "(EMPTY)", "on", imapHost + ":" + imapPort)
+  console.log("[v0] IMAP_CENTRAL_USER from env:", process.env.IMAP_CENTRAL_USER ? "SET" : "MISSING")
+  console.log("[v0] IMAP_CENTRAL_PASS from env:", process.env.IMAP_CENTRAL_PASS ? "SET" : "MISSING")
 
   if (!centralUser || !centralPass) {
     return NextResponse.json(
       {
-        error: `Credenciais do servidor de email nao configuradas. IMAP_CENTRAL_USER: ${centralUser ? "OK" : "VAZIO"}, IMAP_CENTRAL_PASS: ${centralPass ? "OK" : "VAZIO"}. Verifique as variaveis de ambiente.`,
+        error: `Variavel de ambiente ausente. IMAP_CENTRAL_USER: ${centralUser ? "OK" : "VAZIO"}, IMAP_CENTRAL_PASS: ${centralPass ? "OK" : "VAZIO"}. Adicione as variaveis no painel Vars do v0.`,
       },
       { status: 500 }
     )
@@ -81,19 +89,19 @@ export async function GET(request: NextRequest) {
         host: imapHost,
         port: imapPort,
         tls: true,
-        authTimeout: 10000,
+        authTimeout: 15000,
         tlsOptions: { rejectUnauthorized: false },
       },
     }
 
+    console.log("[v0] Attempting IMAP connection...")
     connection = await imapSimple.connect(config)
+    console.log("[v0] Connected! Opening INBOX...")
     await connection.openBox("INBOX")
+    console.log("[v0] INBOX open. Searching TO:", fullAddress)
 
-    // SINCE filter: only search last 24 hours for speed
-    const sinceDate = new Date(Date.now() - 24 * 60 * 60 * 1000)
-    const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
-    const sinceStr = `${sinceDate.getUTCDate()}-${months[sinceDate.getUTCMonth()]}-${sinceDate.getUTCFullYear()}`
-    const searchCriteria = [["SINCE", sinceStr], ["TO", fullAddress]]
+    // Simple search: only filter by TO header, no date filter to avoid timezone issues
+    const searchCriteria = [["TO", fullAddress]]
     const fetchOptions = {
       bodies: ["HEADER", ""],
       markSeen: false,
@@ -101,6 +109,7 @@ export async function GET(request: NextRequest) {
     }
 
     const messages = await connection.search(searchCriteria, fetchOptions)
+    console.log("[v0] Search returned", messages.length, "messages for", fullAddress)
 
     // Take the last 10 messages (safe against spam bursts)
     const recentMessages = messages.slice(-10).reverse()
