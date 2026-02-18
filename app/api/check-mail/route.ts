@@ -53,30 +53,50 @@ export async function GET(request: NextRequest) {
     )
   }
 
-  // Central inbox credentials — all domains are forwarded here via Cloudflare Email Routing
-  // Fallback: you can hardcode credentials here if env vars are not working
-  const FALLBACK_USER = "" // e.g. "sukoademirultra@sukoultra.shop"
-  const FALLBACK_PASS = "" // e.g. "your-password-here"
+  // Determine which IMAP account to connect to based on domain:
+  // - sukospot.shop subdomains: Cloudflare Email Routing -> central inbox (IMAP_CENTRAL_USER)
+  // - Other domains (sukodocursor, sukoultra, sukov0dev): Direct Titan accounts with own credentials
+  const bareDomain = normalizedDomain.startsWith("@") ? normalizedDomain.slice(1) : normalizedDomain
+  const isCloudflareForwarded = bareDomain === "sukospot.shop" || bareDomain.endsWith(".sukospot.shop")
 
-  const centralUser = process.env.IMAP_CENTRAL_USER || FALLBACK_USER
-  const centralPass = process.env.IMAP_CENTRAL_PASS || FALLBACK_PASS
+  let imapUser: string
+  let imapPass: string
+  let useLocalFilter: boolean // true = fetch all + filter locally, false = direct inbox
+
+  if (isCloudflareForwarded) {
+    // Cloudflare forwards *@*.sukospot.shop -> central inbox
+    imapUser = process.env.IMAP_CENTRAL_USER || ""
+    imapPass = process.env.IMAP_CENTRAL_PASS || ""
+    useLocalFilter = true
+  } else if (bareDomain === "sukodocursor.shop") {
+    imapUser = process.env.IMAP_USER_CURSOR || ""
+    imapPass = process.env.IMAP_PASS_CURSOR || ""
+    useLocalFilter = false
+  } else if (bareDomain === "sukoultra.shop") {
+    imapUser = process.env.IMAP_USER_ULTRA || ""
+    imapPass = process.env.IMAP_PASS_ULTRA || ""
+    useLocalFilter = false
+  } else if (bareDomain === "sukov0dev.shop") {
+    imapUser = process.env.IMAP_USER_V0 || ""
+    imapPass = process.env.IMAP_PASS_V0 || ""
+    useLocalFilter = false
+  } else {
+    return NextResponse.json({ error: "Dominio sem credenciais configuradas." }, { status: 400 })
+  }
+
   const imapHost = process.env.IMAP_HOST || "imap.titan.email"
   const imapPort = parseInt(process.env.IMAP_PORT || "993", 10)
 
-  console.log("[v0] Connecting to", centralUser || "(EMPTY)", "on", imapHost + ":" + imapPort)
-  console.log("[v0] IMAP_CENTRAL_USER from env:", process.env.IMAP_CENTRAL_USER ? "SET" : "MISSING")
-  console.log("[v0] IMAP_CENTRAL_PASS from env:", process.env.IMAP_CENTRAL_PASS ? "SET" : "MISSING")
+  console.log("[v0] Domain:", bareDomain, "| Cloudflare forwarded:", isCloudflareForwarded)
+  console.log("[v0] Connecting to", imapUser || "(EMPTY)", "on", imapHost + ":" + imapPort)
 
-  if (!centralUser || !centralPass) {
+  if (!imapUser || !imapPass) {
     return NextResponse.json(
-      {
-        error: `Variavel de ambiente ausente. IMAP_CENTRAL_USER: ${centralUser ? "OK" : "VAZIO"}, IMAP_CENTRAL_PASS: ${centralPass ? "OK" : "VAZIO"}. Adicione as variaveis no painel Vars do v0.`,
-      },
+      { error: `Credenciais IMAP nao configuradas para ${bareDomain}. Verifique as variaveis de ambiente.` },
       { status: 500 }
     )
   }
 
-  // The full address the user wants to check — Cloudflare preserves this in the TO header
   const fullAddress = `${user}${normalizedDomain}`
 
   let connection: Awaited<ReturnType<typeof imapSimple.connect>> | null = null
@@ -84,8 +104,8 @@ export async function GET(request: NextRequest) {
   try {
     const config = {
       imap: {
-        user: centralUser,
-        password: centralPass,
+        user: imapUser,
+        password: imapPass,
         host: imapHost,
         port: imapPort,
         tls: true,
@@ -98,121 +118,113 @@ export async function GET(request: NextRequest) {
     connection = await imapSimple.connect(config)
     console.log("[v0] Connected! Opening INBOX...")
     await connection.openBox("INBOX")
-    // --- FETCH & FILTER STRATEGY ---
-    // Titan/HostGator IMAP SEARCH TO is unreliable for forwarded emails.
-    // Instead: fetch last 30 messages, then filter locally by TO / X-Original-To header.
-    console.log("[v0] Fetching last 30 emails from INBOX for local filtering...")
 
-    const allCriteria = ["ALL"]
     const fetchOptions = {
       bodies: ["HEADER", ""],
       markSeen: false,
       struct: true,
     }
 
-    const allMessages = await connection.search(allCriteria, fetchOptions)
+    const allMessages = await connection.search(["ALL"], fetchOptions)
     console.log("[v0] Total messages in INBOX:", allMessages.length)
 
-    // Take the last 30 (most recent), then filter locally
+    // Take the most recent messages
     const recentBatch = allMessages.slice(-30).reverse()
-    const targetLower = fullAddress.toLowerCase()
 
-    // Phase 1: Parse and filter by TO header locally
-    const matchedEmails: Array<{
-      id: string
-      from: string
-      subject: string
-      date: string
-      body: string
+    type ParsedEmail = {
+      id: string; from: string; subject: string; date: string; body: string
       attachments: Array<{ filename: string; contentType: string; size: number; content: string }>
-      uid: number
-      parsedDate: Date | null
-    }> = []
-
-    for (let i = 0; i < recentBatch.length; i++) {
-      const message = recentBatch[i]
-      try {
-        const allBody = message.parts.find((part: { which: string }) => part.which === "")
-        const headerPart = message.parts.find((part: { which: string }) => part.which === "HEADER")
-        const rawEmail = allBody?.body || ""
-
-        // Log ALL headers from each message so we can see what Cloudflare/Titan provides
-        if (headerPart?.body) {
-          const headerKeys = Object.keys(headerPart.body)
-          console.log(`[v0] Message ${i} headers available:`, headerKeys.join(", "))
-          console.log(`[v0] Message ${i} TO:`, JSON.stringify(headerPart.body.to))
-          console.log(`[v0] Message ${i} DELIVERED-TO:`, JSON.stringify(headerPart.body["delivered-to"]))
-          console.log(`[v0] Message ${i} X-ORIGINAL-TO:`, JSON.stringify(headerPart.body["x-original-to"]))
-          console.log(`[v0] Message ${i} X-FORWARDED-TO:`, JSON.stringify(headerPart.body["x-forwarded-to"]))
-          console.log(`[v0] Message ${i} ENVELOPE-TO:`, JSON.stringify(headerPart.body["envelope-to"]))
-          console.log(`[v0] Message ${i} X-RECEIVED-FOR:`, JSON.stringify(headerPart.body["x-received-for"]))
-          console.log(`[v0] Message ${i} SUBJECT:`, JSON.stringify(headerPart.body.subject))
-          console.log(`[v0] Message ${i} FROM:`, JSON.stringify(headerPart.body.from))
-        }
-
-        // Check ALL possible headers where the original recipient might be
-        const toHeader = (headerPart?.body?.to || []).join(" ").toLowerCase()
-        const xOrigTo = (headerPart?.body?.["x-original-to"] || []).join(" ").toLowerCase()
-        const deliveredTo = (headerPart?.body?.["delivered-to"] || []).join(" ").toLowerCase()
-        const ccHeader = (headerPart?.body?.cc || []).join(" ").toLowerCase()
-        const xForwardedTo = (headerPart?.body?.["x-forwarded-to"] || []).join(" ").toLowerCase()
-        const envelopeTo = (headerPart?.body?.["envelope-to"] || []).join(" ").toLowerCase()
-        const xReceivedFor = (headerPart?.body?.["x-received-for"] || []).join(" ").toLowerCase()
-
-        // Also check the raw email body for the target address as a last resort
-        const rawLower = typeof rawEmail === "string" ? rawEmail.substring(0, 3000).toLowerCase() : ""
-
-        const matchesTarget =
-          toHeader.includes(targetLower) ||
-          xOrigTo.includes(targetLower) ||
-          deliveredTo.includes(targetLower) ||
-          ccHeader.includes(targetLower) ||
-          xForwardedTo.includes(targetLower) ||
-          envelopeTo.includes(targetLower) ||
-          xReceivedFor.includes(targetLower) ||
-          rawLower.includes(targetLower)
-
-        console.log(`[v0] Message ${i} matches "${targetLower}":`, matchesTarget)
-
-        if (!matchesTarget) continue
-
-        // Full parse only for matching messages
-        const parsed = await simpleParser(rawEmail)
-
-        const fromAddress = parsed.from?.value?.[0]
-        const fromName = fromAddress?.name || fromAddress?.address || "Remetente desconhecido"
-        const subject = parsed.subject || "(Sem assunto)"
-        const date = parsed.date ? formatRelativeTime(parsed.date) : "Desconhecido"
-        const body = parsed.html || parsed.textAsHtml || `<p>${parsed.text || "Sem conteudo"}</p>`
-
-        const attachments = (parsed.attachments || []).map((att) => ({
-          filename: att.filename || "attachment",
-          contentType: att.contentType || "application/octet-stream",
-          size: att.size || 0,
-          content: att.content.toString("base64"),
-        }))
-
-        matchedEmails.push({
-          id: parsed.messageId || `msg-${i}`,
-          from: fromName,
-          subject,
-          date,
-          body,
-          attachments,
-          uid: message.attributes.uid,
-          parsedDate: parsed.date || null,
-        })
-      } catch {
-        // Skip unparseable messages silently
-      }
+      uid: number; parsedDate: Date | null
     }
+    const matchedEmails: ParsedEmail[] = []
 
-    console.log("[v0] Found", matchedEmails.length, "matches locally for", fullAddress)
+    if (useLocalFilter) {
+      // --- CLOUDFLARE FORWARDED: fetch all, filter locally by headers ---
+      const targetLower = fullAddress.toLowerCase()
+      console.log("[v0] Using local filter for Cloudflare-forwarded domain. Target:", targetLower)
+
+      for (let i = 0; i < recentBatch.length; i++) {
+        const message = recentBatch[i]
+        try {
+          const allBody = message.parts.find((part: { which: string }) => part.which === "")
+          const headerPart = message.parts.find((part: { which: string }) => part.which === "HEADER")
+          const rawEmail = allBody?.body || ""
+
+          // Check all possible headers + raw email for the target address
+          const toHeader = (headerPart?.body?.to || []).join(" ").toLowerCase()
+          const xOrigTo = (headerPart?.body?.["x-original-to"] || []).join(" ").toLowerCase()
+          const deliveredTo = (headerPart?.body?.["delivered-to"] || []).join(" ").toLowerCase()
+          const ccHeader = (headerPart?.body?.cc || []).join(" ").toLowerCase()
+          const xForwardedTo = (headerPart?.body?.["x-forwarded-to"] || []).join(" ").toLowerCase()
+          const rawLower = typeof rawEmail === "string" ? rawEmail.substring(0, 3000).toLowerCase() : ""
+
+          const matchesTarget =
+            toHeader.includes(targetLower) ||
+            xOrigTo.includes(targetLower) ||
+            deliveredTo.includes(targetLower) ||
+            ccHeader.includes(targetLower) ||
+            xForwardedTo.includes(targetLower) ||
+            rawLower.includes(targetLower)
+
+          if (!matchesTarget) continue
+
+          const parsed = await simpleParser(rawEmail)
+          const fromAddress = parsed.from?.value?.[0]
+          matchedEmails.push({
+            id: parsed.messageId || `msg-${i}`,
+            from: fromAddress?.name || fromAddress?.address || "Remetente desconhecido",
+            subject: parsed.subject || "(Sem assunto)",
+            date: parsed.date ? formatRelativeTime(parsed.date) : "Desconhecido",
+            body: parsed.html || parsed.textAsHtml || `<p>${parsed.text || "Sem conteudo"}</p>`,
+            attachments: (parsed.attachments || []).map((att) => ({
+              filename: att.filename || "attachment",
+              contentType: att.contentType || "application/octet-stream",
+              size: att.size || 0,
+              content: att.content.toString("base64"),
+            })),
+            uid: message.attributes.uid,
+            parsedDate: parsed.date || null,
+          })
+        } catch { /* skip */ }
+      }
+      console.log("[v0] Found", matchedEmails.length, "matches locally for", fullAddress)
+    } else {
+      // --- DIRECT TITAN: all emails in this inbox belong to this domain ---
+      // No filtering needed -- just parse the most recent messages
+      console.log("[v0] Direct Titan inbox for", bareDomain, "- returning all recent messages")
+
+      for (let i = 0; i < Math.min(recentBatch.length, 10); i++) {
+        const message = recentBatch[i]
+        try {
+          const allBody = message.parts.find((part: { which: string }) => part.which === "")
+          const rawEmail = allBody?.body || ""
+
+          const parsed = await simpleParser(rawEmail)
+          const fromAddress = parsed.from?.value?.[0]
+          matchedEmails.push({
+            id: parsed.messageId || `msg-${i}`,
+            from: fromAddress?.name || fromAddress?.address || "Remetente desconhecido",
+            subject: parsed.subject || "(Sem assunto)",
+            date: parsed.date ? formatRelativeTime(parsed.date) : "Desconhecido",
+            body: parsed.html || parsed.textAsHtml || `<p>${parsed.text || "Sem conteudo"}</p>`,
+            attachments: (parsed.attachments || []).map((att) => ({
+              filename: att.filename || "attachment",
+              contentType: att.contentType || "application/octet-stream",
+              size: att.size || 0,
+              content: att.content.toString("base64"),
+            })),
+            uid: message.attributes.uid,
+            parsedDate: parsed.date || null,
+          })
+        } catch { /* skip */ }
+      }
+      console.log("[v0] Parsed", matchedEmails.length, "emails from direct inbox")
+    }
 
     // Take top 10 matches
     const emails = matchedEmails.slice(0, 10).map(({ uid, parsedDate, ...email }) => email)
 
-    // --- Automatic Cleanup: delete matched messages older than 30 minutes ---
+    // --- Automatic Cleanup: delete messages older than 30 minutes ---
     try {
       const thirtyMinAgo = new Date(Date.now() - 30 * 60 * 1000)
       const uidsToDelete = matchedEmails
@@ -220,7 +232,7 @@ export async function GET(request: NextRequest) {
         .map((e) => e.uid)
 
       if (uidsToDelete.length > 0) {
-        console.log("[v0] Cleanup: deleting", uidsToDelete.length, "messages older than 30 min")
+        console.log("[v0] Cleanup: deleting", uidsToDelete.length, "old messages")
         await connection.addFlags(uidsToDelete, "\\Deleted")
         await new Promise<void>((resolve, reject) => {
           connection!.imap.expunge((err: Error | null) => {
