@@ -196,15 +196,30 @@ export async function GET(request: NextRequest) {
       }
       console.log("[v0] Found", matchedEmails.length, "matches locally for", fullAddress)
     } else {
-      // --- DIRECT TITAN: all emails in this inbox belong to this domain ---
-      // No filtering needed -- just parse the most recent messages
-      console.log("[v0] Direct Titan inbox for", bareDomain, "- returning all recent messages")
+      // --- DIRECT TITAN: catch-all inbox, filter by TO header for the specific address ---
+      const targetLower = fullAddress.toLowerCase()
+      console.log("[v0] Direct Titan inbox for", bareDomain, "- filtering by TO:", targetLower)
 
-      for (let i = 0; i < Math.min(recentBatch.length, 10); i++) {
+      for (let i = 0; i < recentBatch.length; i++) {
         const message = recentBatch[i]
         try {
           const allBody = message.parts.find((part: { which: string }) => part.which === "")
+          const headerPart = message.parts.find((part: { which: string }) => part.which === "HEADER")
           const rawEmail = allBody?.body || ""
+
+          // Filter: only show emails addressed to this specific user
+          const toHeader = (headerPart?.body?.to || []).join(" ").toLowerCase()
+          const ccHeader = (headerPart?.body?.cc || []).join(" ").toLowerCase()
+          const deliveredTo = (headerPart?.body?.["delivered-to"] || []).join(" ").toLowerCase()
+          const rawLower = typeof rawEmail === "string" ? rawEmail.substring(0, 3000).toLowerCase() : ""
+
+          const matchesTarget =
+            toHeader.includes(targetLower) ||
+            ccHeader.includes(targetLower) ||
+            deliveredTo.includes(targetLower) ||
+            rawLower.includes(targetLower)
+
+          if (!matchesTarget) continue
 
           const parsed = await simpleParser(rawEmail)
           const fromAddress = parsed.from?.value?.[0]
@@ -225,7 +240,7 @@ export async function GET(request: NextRequest) {
           })
         } catch { /* skip */ }
       }
-      console.log("[v0] Parsed", matchedEmails.length, "emails from direct inbox")
+      console.log("[v0] Found", matchedEmails.length, "matches for", fullAddress, "in direct inbox")
     }
 
     // Take top 10 matches
