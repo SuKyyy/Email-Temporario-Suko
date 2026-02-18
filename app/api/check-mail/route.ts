@@ -89,7 +89,11 @@ export async function GET(request: NextRequest) {
     connection = await imapSimple.connect(config)
     await connection.openBox("INBOX")
 
-    const searchCriteria = [["TO", fullAddress]]
+    // SINCE filter: only search last 24 hours for speed
+    const sinceDate = new Date(Date.now() - 24 * 60 * 60 * 1000)
+    const months = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"]
+    const sinceStr = `${sinceDate.getUTCDate()}-${months[sinceDate.getUTCMonth()]}-${sinceDate.getUTCFullYear()}`
+    const searchCriteria = [["SINCE", sinceStr], ["TO", fullAddress]]
     const fetchOptions = {
       bodies: ["HEADER", ""],
       markSeen: false,

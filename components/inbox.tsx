@@ -15,29 +15,6 @@ import {
   User,
 } from "lucide-react"
 
-function sanitizeHtml(html: string): string {
-  if (typeof window === "undefined") return ""
-  const parser = new DOMParser()
-  const doc = parser.parseFromString(html, "text/html")
-  const dangerous = doc.querySelectorAll(
-    "script, iframe, object, embed, form, input, textarea, button[type=submit]"
-  )
-  dangerous.forEach((el) => el.remove())
-  const all = doc.querySelectorAll("*")
-  all.forEach((el) => {
-    const attrs = Array.from(el.attributes)
-    attrs.forEach((attr) => {
-      if (
-        attr.name.startsWith("on") ||
-        attr.value.trim().toLowerCase().startsWith("javascript:")
-      ) {
-        el.removeAttribute(attr.name)
-      }
-    })
-  })
-  return doc.body.innerHTML
-}
-
 export interface Attachment {
   filename: string
   contentType: string
@@ -97,22 +74,41 @@ function downloadAttachment(att: Attachment) {
   URL.revokeObjectURL(url)
 }
 
-function SanitizedHtml({ html }: { html: string }) {
-  const containerRef = useRef<HTMLDivElement>(null)
+function SafeHtmlContent({ html }: { html: string }) {
+  const ref = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    if (!containerRef.current) return
-    containerRef.current.innerHTML = sanitizeHtml(html)
-    const links = containerRef.current.querySelectorAll("a")
-    links.forEach((link) => {
+    if (!ref.current || typeof window === "undefined") return
+
+    const parser = new DOMParser()
+    const doc = parser.parseFromString(html, "text/html")
+
+    doc
+      .querySelectorAll("script,iframe,object,embed,form,input,textarea")
+      .forEach((el) => el.remove())
+
+    doc.querySelectorAll("*").forEach((el) => {
+      Array.from(el.attributes).forEach((attr) => {
+        if (
+          attr.name.startsWith("on") ||
+          attr.value.trim().toLowerCase().startsWith("javascript:")
+        ) {
+          el.removeAttribute(attr.name)
+        }
+      })
+    })
+
+    doc.querySelectorAll("a").forEach((link) => {
       link.setAttribute("target", "_blank")
       link.setAttribute("rel", "noopener noreferrer")
     })
+
+    ref.current.innerHTML = doc.body.innerHTML
   }, [html])
 
   return (
     <div
-      ref={containerRef}
+      ref={ref}
       className="prose prose-invert prose-sm max-w-none text-sm leading-relaxed text-card-foreground/80 [&_a]:text-accent [&_a]:underline [&_img]:max-w-full [&_img]:rounded-md"
     />
   )
@@ -124,7 +120,8 @@ function AttachmentList({ attachments }: { attachments: Attachment[] }) {
     <div className="mt-3 border-t border-border pt-3">
       <div className="mb-2 flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
         <Paperclip className="h-3 w-3" />
-        {attachments.length} anexo{attachments.length > 1 ? "s" : ""}
+        {attachments.length} {"anexo"}
+        {attachments.length > 1 ? "s" : ""}
       </div>
       <div className="flex flex-col gap-2">
         {attachments.map((att, i) => {
@@ -142,7 +139,9 @@ function AttachmentList({ attachments }: { attachments: Attachment[] }) {
                 <p className="truncate text-xs font-medium text-card-foreground">
                   {att.filename}
                 </p>
-                <p className="text-[11px] text-muted-foreground">{formatBytes(att.size)}</p>
+                <p className="text-[11px] text-muted-foreground">
+                  {formatBytes(att.size)}
+                </p>
               </div>
               <Download className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
             </button>
@@ -200,7 +199,9 @@ function EmailItem({ email }: { email: Email }) {
               <span>{email.date}</span>
             </div>
           </div>
-          <p className="mt-0.5 truncate text-sm text-muted-foreground">{email.subject}</p>
+          <p className="mt-0.5 truncate text-sm text-muted-foreground">
+            {email.subject}
+          </p>
         </div>
         <ChevronDown
           className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${expanded ? "rotate-180" : ""}`}
@@ -208,7 +209,7 @@ function EmailItem({ email }: { email: Email }) {
       </button>
       {expanded && (
         <div className="border-t border-border bg-secondary/30 px-5 py-4">
-          <SanitizedHtml html={email.body} />
+          <SafeHtmlContent html={email.body} />
           {hasAttachments && <AttachmentList attachments={email.attachments!} />}
         </div>
       )}
@@ -230,7 +231,9 @@ export function Inbox({
   return (
     <div className="overflow-hidden rounded-xl border border-border bg-card shadow-lg">
       <div className="flex items-center gap-3 border-b border-border px-5 py-3">
-        <h3 className="text-sm font-semibold text-card-foreground">Caixa de Entrada</h3>
+        <h3 className="text-sm font-semibold text-card-foreground">
+          Caixa de Entrada
+        </h3>
         {activeEmail && activeDomain && (
           <span className="rounded-full bg-secondary px-3 py-0.5 font-mono text-xs text-muted-foreground">
             {activeEmail}
@@ -245,7 +248,9 @@ export function Inbox({
         {activeEmail && (
           <div className="ml-auto flex items-center gap-3">
             {statusMessage ? (
-              <span className="text-xs text-muted-foreground">{statusMessage}</span>
+              <span className="text-xs text-muted-foreground">
+                {statusMessage}
+              </span>
             ) : (
               <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
                 {isPolling ? (
@@ -285,10 +290,7 @@ export function Inbox({
 
       {activeEmail && (
         <div className="flex items-start gap-2.5 border-b border-border bg-amber-950/30 px-5 py-3">
-          <span
-            className="mt-0.5 shrink-0 text-sm text-amber-400"
-            aria-hidden="true"
-          >
+          <span className="mt-0.5 shrink-0 text-sm text-amber-400" aria-hidden="true">
             {"⚠"}
           </span>
           <p className="text-xs leading-relaxed text-amber-200/80">
