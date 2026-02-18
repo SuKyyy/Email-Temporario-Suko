@@ -15,27 +15,26 @@ import {
   User,
 } from "lucide-react"
 
-// Lightweight client-side HTML sanitizer using the browser's DOMParser
 function sanitizeHtml(html: string): string {
   if (typeof window === "undefined") return ""
   const parser = new DOMParser()
   const doc = parser.parseFromString(html, "text/html")
-
-  // Remove dangerous elements
-  const dangerous = doc.querySelectorAll("script, iframe, object, embed, form, input, textarea, button[type=submit]")
+  const dangerous = doc.querySelectorAll(
+    "script, iframe, object, embed, form, input, textarea, button[type=submit]"
+  )
   dangerous.forEach((el) => el.remove())
-
-  // Remove event handler attributes from all elements
   const all = doc.querySelectorAll("*")
   all.forEach((el) => {
     const attrs = Array.from(el.attributes)
     attrs.forEach((attr) => {
-      if (attr.name.startsWith("on") || attr.value.trim().toLowerCase().startsWith("javascript:")) {
+      if (
+        attr.name.startsWith("on") ||
+        attr.value.trim().toLowerCase().startsWith("javascript:")
+      ) {
         el.removeAttribute(attr.name)
       }
     })
   })
-
   return doc.body.innerHTML
 }
 
@@ -43,7 +42,7 @@ export interface Attachment {
   filename: string
   contentType: string
   size: number
-  content: string // base64
+  content: string
 }
 
 export interface Email {
@@ -104,8 +103,6 @@ function SanitizedHtml({ html }: { html: string }) {
   useEffect(() => {
     if (!containerRef.current) return
     containerRef.current.innerHTML = sanitizeHtml(html)
-
-    // Open links in new tab
     const links = containerRef.current.querySelectorAll("a")
     links.forEach((link) => {
       link.setAttribute("target", "_blank")
@@ -116,14 +113,13 @@ function SanitizedHtml({ html }: { html: string }) {
   return (
     <div
       ref={containerRef}
-      className="prose prose-invert prose-sm max-w-none text-sm leading-relaxed text-card-foreground/80 [&_img]:max-w-full [&_img]:rounded-md [&_a]:text-accent [&_a]:underline"
+      className="prose prose-invert prose-sm max-w-none text-sm leading-relaxed text-card-foreground/80 [&_a]:text-accent [&_a]:underline [&_img]:max-w-full [&_img]:rounded-md"
     />
   )
 }
 
 function AttachmentList({ attachments }: { attachments: Attachment[] }) {
   if (!attachments.length) return null
-
   return (
     <div className="mt-3 border-t border-border pt-3">
       <div className="mb-2 flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
@@ -143,7 +139,9 @@ function AttachmentList({ attachments }: { attachments: Attachment[] }) {
                 <Icon className="h-4 w-4 text-primary" />
               </div>
               <div className="min-w-0 flex-1">
-                <p className="truncate text-xs font-medium text-card-foreground">{att.filename}</p>
+                <p className="truncate text-xs font-medium text-card-foreground">
+                  {att.filename}
+                </p>
                 <p className="text-[11px] text-muted-foreground">{formatBytes(att.size)}</p>
               </div>
               <Download className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
@@ -191,10 +189,11 @@ function EmailItem({ email }: { email: Email }) {
             <User className="h-4 w-4 text-primary" />
           )}
         </div>
-
         <div className="min-w-0 flex-1">
           <div className="flex items-center justify-between gap-2">
-            <span className="truncate text-sm font-semibold text-card-foreground">{email.from}</span>
+            <span className="truncate text-sm font-semibold text-card-foreground">
+              {email.from}
+            </span>
             <div className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
               {hasAttachments && <Paperclip className="h-3 w-3" />}
               <Clock className="h-3 w-3" />
@@ -203,12 +202,10 @@ function EmailItem({ email }: { email: Email }) {
           </div>
           <p className="mt-0.5 truncate text-sm text-muted-foreground">{email.subject}</p>
         </div>
-
         <ChevronDown
           className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${expanded ? "rotate-180" : ""}`}
         />
       </button>
-
       {expanded && (
         <div className="border-t border-border bg-secondary/30 px-5 py-4">
           <SanitizedHtml html={email.body} />
@@ -236,7 +233,8 @@ export function Inbox({
         <h3 className="text-sm font-semibold text-card-foreground">Caixa de Entrada</h3>
         {activeEmail && activeDomain && (
           <span className="rounded-full bg-secondary px-3 py-0.5 font-mono text-xs text-muted-foreground">
-            {activeEmail}{activeDomain}
+            {activeEmail}
+            {activeDomain}
           </span>
         )}
         {emails.length > 0 && (
@@ -244,7 +242,6 @@ export function Inbox({
             {emails.length}
           </span>
         )}
-
         {activeEmail && (
           <div className="ml-auto flex items-center gap-3">
             {statusMessage ? (
@@ -262,7 +259,9 @@ export function Inbox({
                       <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-accent opacity-60" />
                       <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-accent" />
                     </span>
-                    Atualiza em {countdown}s
+                    {"Atualiza em "}
+                    {countdown}
+                    {"s"}
                   </>
                 )}
               </span>
@@ -273,8 +272,12 @@ export function Inbox({
               className="flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1 text-xs text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
               aria-label="Atualizar caixa de entrada"
             >
-              <RefreshCw className={`h-3.5 w-3.5 ${isRefreshing ? "animate-spin" : ""}`} />
-              <span className="hidden sm:inline">{isRefreshing ? "Atualizando..." : "Atualizar"}</span>
+              <RefreshCw
+                className={`h-3.5 w-3.5 ${isRefreshing ? "animate-spin" : ""}`}
+              />
+              <span className="hidden sm:inline">
+                {isRefreshing ? "Atualizando..." : "Atualizar"}
+              </span>
             </button>
           </div>
         )}
@@ -282,9 +285,16 @@ export function Inbox({
 
       {activeEmail && (
         <div className="flex items-start gap-2.5 border-b border-border bg-amber-950/30 px-5 py-3">
-          <span className="mt-0.5 shrink-0 text-sm text-amber-400" aria-hidden="true">&#9888;</span>
+          <span
+            className="mt-0.5 shrink-0 text-sm text-amber-400"
+            aria-hidden="true"
+          >
+            {"⚠"}
+          </span>
           <p className="text-xs leading-relaxed text-amber-200/80">
-            Emails podem levar de 15 a 30 segundos para chegar devido ao processamento do servidor. Se nao encontrar, aguarde um momento e clique em Atualizar.
+            Emails podem levar de 15 a 30 segundos para chegar devido ao
+            processamento do servidor. Se nao encontrar, aguarde um momento e
+            clique em Atualizar.
           </p>
         </div>
       )}
