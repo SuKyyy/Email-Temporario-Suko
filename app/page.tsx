@@ -1,9 +1,11 @@
 "use client"
 
-import { useState, useCallback } from "react"
+import { useState, useCallback, useEffect, useRef } from "react"
 import { SiteHeader } from "@/components/site-header"
 import { EmailInput, ROOT_DOMAINS, isSupportedDomain } from "@/components/email-input"
 import { Inbox, type Email } from "@/components/inbox"
+
+const POLL_SECONDS = 10
 
 export default function Page() {
   const [email, setEmail] = useState("")
@@ -15,6 +17,17 @@ export default function Page() {
   const [activeDomain, setActiveDomain] = useState<string | null>(null)
   const [hasSearched, setHasSearched] = useState(false)
   const [statusMessage, setStatusMessage] = useState<string | null>(null)
+  const [countdown, setCountdown] = useState(POLL_SECONDS)
+
+  // Refs to avoid stale closures in the interval
+  const activeUserRef = useRef(activeUser)
+  const activeDomainRef = useRef(activeDomain)
+  const emailsRef = useRef(emails)
+  const fetchingRef = useRef(false)
+
+  useEffect(() => { activeUserRef.current = activeUser }, [activeUser])
+  useEffect(() => { activeDomainRef.current = activeDomain }, [activeDomain])
+  useEffect(() => { emailsRef.current = emails }, [emails])
 
   const fetchEmails = useCallback(async (user: string, domain: string) => {
     const res = await fetch(
@@ -26,6 +39,43 @@ export default function Page() {
     }
     return data.emails as Email[]
   }, [])
+
+  // Auto-poll: countdown every second, fetch when it reaches 0
+  useEffect(() => {
+    if (!activeUser || !activeDomain) return
+
+    setCountdown(POLL_SECONDS)
+
+    const interval = setInterval(() => {
+      setCountdown((prev) => {
+        if (prev <= 1) {
+          // Trigger background fetch at 0
+          if (!fetchingRef.current && activeUserRef.current && activeDomainRef.current) {
+            fetchingRef.current = true
+            fetchEmails(activeUserRef.current, activeDomainRef.current)
+              .then((result) => {
+                // Only update if emails actually changed (prevents flicker)
+                const currentIds = emailsRef.current.map((e) => e.id).join(",")
+                const newIds = result.map((e) => e.id).join(",")
+                if (currentIds !== newIds) {
+                  setEmails(result)
+                }
+              })
+              .catch(() => {
+                // Silent fail on background poll — don't interrupt the user
+              })
+              .finally(() => {
+                fetchingRef.current = false
+              })
+          }
+          return POLL_SECONDS
+        }
+        return prev - 1
+      })
+    }, 1000)
+
+    return () => clearInterval(interval)
+  }, [activeUser, activeDomain, fetchEmails])
 
   const handleCheckMail = useCallback(async () => {
     const trimmed = email.trim()
@@ -76,6 +126,7 @@ export default function Page() {
     if (!activeUser || !activeDomain) return
 
     setRefreshing(true)
+    setCountdown(POLL_SECONDS)
     setStatusMessage("Verificando novos emails...")
 
     try {
@@ -126,6 +177,7 @@ export default function Page() {
             hasSearched={hasSearched}
             isRefreshing={refreshing}
             statusMessage={statusMessage}
+            countdown={countdown}
             onRefresh={handleManualRefresh}
           />
         </div>
