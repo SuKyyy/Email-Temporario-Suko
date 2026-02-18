@@ -14,7 +14,29 @@ import {
   RefreshCw,
   User,
 } from "lucide-react"
-import DOMPurify from "dompurify"
+// Lightweight client-side HTML sanitizer using the browser's DOMParser
+function sanitizeHtml(html: string): string {
+  if (typeof window === "undefined") return ""
+  const parser = new DOMParser()
+  const doc = parser.parseFromString(html, "text/html")
+
+  // Remove dangerous elements
+  const dangerous = doc.querySelectorAll("script, iframe, object, embed, form, input, textarea, button[type=submit]")
+  dangerous.forEach((el) => el.remove())
+
+  // Remove event handler attributes from all elements
+  const all = doc.querySelectorAll("*")
+  all.forEach((el) => {
+    const attrs = Array.from(el.attributes)
+    attrs.forEach((attr) => {
+      if (attr.name.startsWith("on") || attr.value.trim().toLowerCase().startsWith("javascript:")) {
+        el.removeAttribute(attr.name)
+      }
+    })
+  })
+
+  return doc.body.innerHTML
+}
 
 export interface Attachment {
   filename: string
@@ -80,12 +102,7 @@ function SanitizedHtml({ html }: { html: string }) {
 
   useEffect(() => {
     if (!containerRef.current) return
-    const clean = DOMPurify.sanitize(html, {
-      ADD_TAGS: ["style"],
-      ADD_ATTR: ["target", "style"],
-      ALLOW_DATA_ATTR: false,
-    })
-    containerRef.current.innerHTML = clean
+    containerRef.current.innerHTML = sanitizeHtml(html)
 
     // Open links in new tab
     const links = containerRef.current.querySelectorAll("a")

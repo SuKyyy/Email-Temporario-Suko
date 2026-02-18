@@ -42,7 +42,7 @@
     "clsx": "^2.1.1",
     "cmdk": "1.1.1",
     "date-fns": "4.1.0",
-    "dompurify": "^3.2.3",
+
     "embla-carousel-react": "8.5.1",
     "input-otp": "1.4.1",
     "imap-simple": "^5.1.0",
@@ -65,7 +65,7 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.13",
-    "@types/dompurify": "^3.2.0",
+
     "@types/imap-simple": "^4.2.6",
     "@types/mailparser": "^3.4.5",
     "@types/node": "^22",
