@@ -2,12 +2,22 @@
 
 import { Loader2 } from "lucide-react"
 
-export const SUPPORTED_DOMAINS = [
-  "@sukospot.shop",
-  "@sukodocursor.shop",
-  "@sukoultra.shop",
-  "@sukov0dev.shop",
+// Root domains — any subdomain of these is also valid
+// e.g. @sub.sukospot.shop, @anything.sukoultra.shop
+export const ROOT_DOMAINS = [
+  "sukospot.shop",
+  "sukodocursor.shop",
+  "sukoultra.shop",
+  "sukov0dev.shop",
 ] as const
+
+export function isSupportedDomain(domain: string): boolean {
+  // domain comes in as "@something.sukospot.shop" or "@sukospot.shop"
+  const bare = domain.startsWith("@") ? domain.slice(1) : domain
+  return ROOT_DOMAINS.some(
+    (root) => bare === root || bare.endsWith(`.${root}`)
+  )
+}
 
 interface EmailInputProps {
   email: string
@@ -40,7 +50,7 @@ export function EmailInput({
             onKeyDown={(e) => {
               if (e.key === "Enter" && email.trim()) onSubmit()
             }}
-            placeholder="Digite seu email completo (ex: kratos@sukospot.shop)"
+            placeholder="Digite seu email (ex: kratos@sub.sukospot.shop)"
             className={`w-full rounded-lg border bg-secondary px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 ${
               error ? "border-destructive" : "border-border"
             }`}

@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from "react"
 import { SiteHeader } from "@/components/site-header"
-import { EmailInput, SUPPORTED_DOMAINS } from "@/components/email-input"
+import { EmailInput, ROOT_DOMAINS, isSupportedDomain } from "@/components/email-input"
 import { Inbox, type Email } from "@/components/inbox"
 
 export default function Page() {
@@ -33,7 +33,7 @@ export default function Page() {
 
     const atIndex = trimmed.lastIndexOf("@")
     if (atIndex === -1) {
-      setError("Formato de email invalido. Use @dominio.shop")
+      setError("Formato de email invalido. Use usuario@dominio.sukospot.shop")
       return
     }
 
@@ -45,9 +45,9 @@ export default function Page() {
       return
     }
 
-    if (!SUPPORTED_DOMAINS.includes(domain as (typeof SUPPORTED_DOMAINS)[number])) {
+    if (!isSupportedDomain(domain)) {
       setError(
-        `Dominio nao suportado. Disponiveis: ${SUPPORTED_DOMAINS.join(", ")}`
+        `Dominio nao suportado. Use subdominos de: ${ROOT_DOMAINS.map((d) => `@${d}`).join(", ")}`
       )
       return
     }

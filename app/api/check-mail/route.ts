@@ -2,14 +2,19 @@ import { NextRequest, NextResponse } from "next/server"
 import imapSimple from "imap-simple"
 import { simpleParser } from "mailparser"
 
-const SUPPORTED_DOMAINS = [
-  "@sukospot.shop",
-  "@sukodocursor.shop",
-  "@sukoultra.shop",
-  "@sukov0dev.shop",
+const ROOT_DOMAINS = [
+  "sukospot.shop",
+  "sukodocursor.shop",
+  "sukoultra.shop",
+  "sukov0dev.shop",
 ] as const
 
-type SupportedDomain = (typeof SUPPORTED_DOMAINS)[number]
+function isSupportedDomain(domain: string): boolean {
+  const bare = domain.startsWith("@") ? domain.slice(1) : domain
+  return ROOT_DOMAINS.some(
+    (root) => bare === root || bare.endsWith(`.${root}`)
+  )
+}
 
 function formatRelativeTime(date: Date): string {
   const now = Date.now()
@@ -39,10 +44,13 @@ export async function GET(request: NextRequest) {
   }
 
   // Normalize domain: ensure it starts with "@"
-  const normalizedDomain = (rawDomain.startsWith("@") ? rawDomain : `@${rawDomain}`) as SupportedDomain
+  const normalizedDomain = rawDomain.startsWith("@") ? rawDomain : `@${rawDomain}`
 
-  if (!SUPPORTED_DOMAINS.includes(normalizedDomain)) {
-    return NextResponse.json({ error: `Dominio nao suportado: ${normalizedDomain}` }, { status: 400 })
+  if (!isSupportedDomain(normalizedDomain)) {
+    return NextResponse.json(
+      { error: `Dominio nao suportado: ${normalizedDomain}. Use subdominios de: ${ROOT_DOMAINS.map((d) => `@${d}`).join(", ")}` },
+      { status: 400 }
+    )
   }
 
   // Central inbox credentials — all domains are forwarded here via Cloudflare Email Routing
