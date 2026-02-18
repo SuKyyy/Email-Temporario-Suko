@@ -95,8 +95,6 @@ export async function GET(request: NextRequest) {
   const imapHost = process.env.IMAP_HOST || "imap.titan.email"
   const imapPort = parseInt(process.env.IMAP_PORT || "993", 10)
 
-  console.log("[v0] Domain:", bareDomain, "| Subdomain forwarded:", isSubdomainOfSukospot, "| Connecting to:", imapUser || "(EMPTY)")
-
   if (!imapUser || !imapPass) {
     return NextResponse.json(
       { error: `Credenciais IMAP nao configuradas para ${bareDomain}. Verifique as variaveis de ambiente.` },
@@ -121,9 +119,7 @@ export async function GET(request: NextRequest) {
       },
     }
 
-    console.log("[v0] Attempting IMAP connection...")
     connection = await imapSimple.connect(config)
-    console.log("[v0] Connected! Opening INBOX...")
     await connection.openBox("INBOX")
 
     const fetchOptions = {
@@ -133,7 +129,6 @@ export async function GET(request: NextRequest) {
     }
 
     const allMessages = await connection.search(["ALL"], fetchOptions)
-    console.log("[v0] Total messages in INBOX:", allMessages.length)
 
     // Take the most recent messages
     const recentBatch = allMessages.slice(-30).reverse()
@@ -148,8 +143,6 @@ export async function GET(request: NextRequest) {
     if (useLocalFilter) {
       // --- CLOUDFLARE FORWARDED: fetch all, filter locally by headers ---
       const targetLower = fullAddress.toLowerCase()
-      console.log("[v0] Using local filter for Cloudflare-forwarded domain. Target:", targetLower)
-
       for (let i = 0; i < recentBatch.length; i++) {
         const message = recentBatch[i]
         try {
@@ -194,12 +187,9 @@ export async function GET(request: NextRequest) {
           })
         } catch { /* skip */ }
       }
-      console.log("[v0] Found", matchedEmails.length, "matches locally for", fullAddress)
     } else {
       // --- DIRECT TITAN: catch-all inbox, filter by TO header for the specific address ---
       const targetLower = fullAddress.toLowerCase()
-      console.log("[v0] Direct Titan inbox for", bareDomain, "- filtering by TO:", targetLower)
-
       for (let i = 0; i < recentBatch.length; i++) {
         const message = recentBatch[i]
         try {
@@ -240,32 +230,10 @@ export async function GET(request: NextRequest) {
           })
         } catch { /* skip */ }
       }
-      console.log("[v0] Found", matchedEmails.length, "matches for", fullAddress, "in direct inbox")
     }
 
     // Take top 10 matches
     const emails = matchedEmails.slice(0, 10).map(({ uid, parsedDate, ...email }) => email)
-
-    // --- Automatic Cleanup: delete messages older than 30 minutes ---
-    try {
-      const thirtyMinAgo = new Date(Date.now() - 30 * 60 * 1000)
-      const uidsToDelete = matchedEmails
-        .filter((e) => e.parsedDate && e.parsedDate.getTime() < thirtyMinAgo.getTime())
-        .map((e) => e.uid)
-
-      if (uidsToDelete.length > 0) {
-        console.log("[v0] Cleanup: deleting", uidsToDelete.length, "old messages")
-        await connection.addFlags(uidsToDelete, "\\Deleted")
-        await new Promise<void>((resolve, reject) => {
-          connection!.imap.expunge((err: Error | null) => {
-            if (err) reject(err)
-            else resolve()
-          })
-        })
-      }
-    } catch (cleanupErr) {
-      console.error("[v0] Cleanup failed (non-blocking):", cleanupErr instanceof Error ? cleanupErr.message : cleanupErr)
-    }
 
     connection.end()
     connection = null
@@ -282,9 +250,6 @@ export async function GET(request: NextRequest) {
     )
   } catch (err: unknown) {
     const errorMessage = err instanceof Error ? err.message : String(err)
-    const errorStack = err instanceof Error ? err.stack : undefined
-    console.error("[v0] IMAP error message:", errorMessage)
-    console.error("[v0] IMAP error stack:", errorStack)
 
     // Classify the error for the user
     let userMessage: string
