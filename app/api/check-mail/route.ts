@@ -54,15 +54,22 @@ export async function GET(request: NextRequest) {
   }
 
   // Central inbox credentials — all domains are forwarded here via Cloudflare Email Routing
-  const centralUser = process.env.IMAP_CENTRAL_USER || ""
-  const centralPass = process.env.IMAP_CENTRAL_PASS || ""
+  const centralUser = process.env.IMAP_CENTRAL_USER ?? ""
+  const centralPass = process.env.IMAP_CENTRAL_PASS ?? ""
   const imapHost = process.env.IMAP_HOST || "imap.titan.email"
   const imapPort = parseInt(process.env.IMAP_PORT || "993", 10)
 
+  // Diagnostic: log env var status (never log passwords)
+  console.log("[v0] ENV CHECK - IMAP_CENTRAL_USER:", centralUser ? `"${centralUser}"` : "(EMPTY/UNDEFINED)")
+  console.log("[v0] ENV CHECK - IMAP_CENTRAL_PASS:", centralPass ? `(set, ${centralPass.length} chars)` : "(EMPTY/UNDEFINED)")
+  console.log("[v0] ENV CHECK - IMAP_HOST:", imapHost)
+  console.log("[v0] ENV CHECK - IMAP_PORT:", imapPort)
+
   if (!centralUser || !centralPass) {
-    console.error("[v0] Central IMAP credentials missing. Set IMAP_CENTRAL_USER and IMAP_CENTRAL_PASS.")
     return NextResponse.json(
-      { error: "Credenciais do servidor de email nao configuradas." },
+      {
+        error: `Credenciais do servidor de email nao configuradas. IMAP_CENTRAL_USER: ${centralUser ? "OK" : "VAZIO"}, IMAP_CENTRAL_PASS: ${centralPass ? "OK" : "VAZIO"}. Verifique as variaveis de ambiente.`,
+      },
       { status: 500 }
     )
   }
@@ -192,9 +199,22 @@ export async function GET(request: NextRequest) {
     const errorStack = err instanceof Error ? err.stack : undefined
     console.error("[v0] IMAP error message:", errorMessage)
     console.error("[v0] IMAP error stack:", errorStack)
-    console.error("[v0] IMAP full error object:", JSON.stringify(err, Object.getOwnPropertyNames(err as object), 2))
+
+    // Classify the error for the user
+    let userMessage: string
+    const lowerMsg = errorMessage.toLowerCase()
+    if (lowerMsg.includes("login") || lowerMsg.includes("auth") || lowerMsg.includes("credentials") || lowerMsg.includes("no")) {
+      userMessage = `Falha na autenticacao IMAP. Verifique IMAP_CENTRAL_USER e IMAP_CENTRAL_PASS. (${errorMessage})`
+    } else if (lowerMsg.includes("timeout") || lowerMsg.includes("timed out")) {
+      userMessage = `Timeout ao conectar ao servidor IMAP (${imapHost}:${imapPort}). Verifique IMAP_HOST e IMAP_PORT. (${errorMessage})`
+    } else if (lowerMsg.includes("enotfound") || lowerMsg.includes("getaddrinfo") || lowerMsg.includes("econnrefused")) {
+      userMessage = `Servidor IMAP nao encontrado: ${imapHost}:${imapPort}. Verifique IMAP_HOST. (${errorMessage})`
+    } else {
+      userMessage = `Erro IMAP: ${errorMessage}`
+    }
+
     return NextResponse.json(
-      { error: `Erro ao conectar. Verifique o email e tente novamente. (${errorMessage})` },
+      { error: userMessage },
       {
         status: 500,
         headers: {
