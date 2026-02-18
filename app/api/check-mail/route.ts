@@ -136,17 +136,43 @@ export async function GET(request: NextRequest) {
         const headerPart = message.parts.find((part: { which: string }) => part.which === "HEADER")
         const rawEmail = allBody?.body || ""
 
-        // Quick header check first: does TO or X-Original-To match?
+        // Log ALL headers from each message so we can see what Cloudflare/Titan provides
+        if (headerPart?.body) {
+          const headerKeys = Object.keys(headerPart.body)
+          console.log(`[v0] Message ${i} headers available:`, headerKeys.join(", "))
+          console.log(`[v0] Message ${i} TO:`, JSON.stringify(headerPart.body.to))
+          console.log(`[v0] Message ${i} DELIVERED-TO:`, JSON.stringify(headerPart.body["delivered-to"]))
+          console.log(`[v0] Message ${i} X-ORIGINAL-TO:`, JSON.stringify(headerPart.body["x-original-to"]))
+          console.log(`[v0] Message ${i} X-FORWARDED-TO:`, JSON.stringify(headerPart.body["x-forwarded-to"]))
+          console.log(`[v0] Message ${i} ENVELOPE-TO:`, JSON.stringify(headerPart.body["envelope-to"]))
+          console.log(`[v0] Message ${i} X-RECEIVED-FOR:`, JSON.stringify(headerPart.body["x-received-for"]))
+          console.log(`[v0] Message ${i} SUBJECT:`, JSON.stringify(headerPart.body.subject))
+          console.log(`[v0] Message ${i} FROM:`, JSON.stringify(headerPart.body.from))
+        }
+
+        // Check ALL possible headers where the original recipient might be
         const toHeader = (headerPart?.body?.to || []).join(" ").toLowerCase()
         const xOrigTo = (headerPart?.body?.["x-original-to"] || []).join(" ").toLowerCase()
         const deliveredTo = (headerPart?.body?.["delivered-to"] || []).join(" ").toLowerCase()
         const ccHeader = (headerPart?.body?.cc || []).join(" ").toLowerCase()
+        const xForwardedTo = (headerPart?.body?.["x-forwarded-to"] || []).join(" ").toLowerCase()
+        const envelopeTo = (headerPart?.body?.["envelope-to"] || []).join(" ").toLowerCase()
+        const xReceivedFor = (headerPart?.body?.["x-received-for"] || []).join(" ").toLowerCase()
+
+        // Also check the raw email body for the target address as a last resort
+        const rawLower = typeof rawEmail === "string" ? rawEmail.substring(0, 3000).toLowerCase() : ""
 
         const matchesTarget =
           toHeader.includes(targetLower) ||
           xOrigTo.includes(targetLower) ||
           deliveredTo.includes(targetLower) ||
-          ccHeader.includes(targetLower)
+          ccHeader.includes(targetLower) ||
+          xForwardedTo.includes(targetLower) ||
+          envelopeTo.includes(targetLower) ||
+          xReceivedFor.includes(targetLower) ||
+          rawLower.includes(targetLower)
+
+        console.log(`[v0] Message ${i} matches "${targetLower}":`, matchesTarget)
 
         if (!matchesTarget) continue
 
