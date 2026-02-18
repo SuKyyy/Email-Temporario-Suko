@@ -57,17 +57,25 @@ export async function GET(request: NextRequest) {
   // - sukospot.shop subdomains: Cloudflare Email Routing -> central inbox (IMAP_CENTRAL_USER)
   // - Other domains (sukodocursor, sukoultra, sukov0dev): Direct Titan accounts with own credentials
   const bareDomain = normalizedDomain.startsWith("@") ? normalizedDomain.slice(1) : normalizedDomain
-  const isCloudflareForwarded = bareDomain === "sukospot.shop" || bareDomain.endsWith(".sukospot.shop")
+
+  // Subdomains of sukospot.shop use Cloudflare Email Routing -> sukoademirultra@sukoultra.shop
+  // Direct root domains each have their own Titan catch-all inbox
+  const isSubdomainOfSukospot = bareDomain.endsWith(".sukospot.shop")
 
   let imapUser: string
   let imapPass: string
-  let useLocalFilter: boolean // true = fetch all + filter locally, false = direct inbox
+  let useLocalFilter: boolean
 
-  if (isCloudflareForwarded) {
-    // Cloudflare forwards *@*.sukospot.shop -> central inbox
-    imapUser = process.env.IMAP_CENTRAL_USER || ""
-    imapPass = process.env.IMAP_CENTRAL_PASS || ""
+  if (isSubdomainOfSukospot) {
+    // Cloudflare forwards *@*.sukospot.shop -> sukoademirultra@sukoultra.shop
+    imapUser = process.env.IMAP_USER_ULTRA || ""
+    imapPass = process.env.IMAP_PASS_ULTRA || ""
     useLocalFilter = true
+  } else if (bareDomain === "sukospot.shop") {
+    // Direct root sukospot.shop -> ademinsukospot@sukospot.shop
+    imapUser = process.env.IMAP_USER_SUKOSPOT || ""
+    imapPass = process.env.IMAP_PASS_SUKOSPOT || ""
+    useLocalFilter = false
   } else if (bareDomain === "sukodocursor.shop") {
     imapUser = process.env.IMAP_USER_CURSOR || ""
     imapPass = process.env.IMAP_PASS_CURSOR || ""
@@ -87,8 +95,7 @@ export async function GET(request: NextRequest) {
   const imapHost = process.env.IMAP_HOST || "imap.titan.email"
   const imapPort = parseInt(process.env.IMAP_PORT || "993", 10)
 
-  console.log("[v0] Domain:", bareDomain, "| Cloudflare forwarded:", isCloudflareForwarded)
-  console.log("[v0] Connecting to", imapUser || "(EMPTY)", "on", imapHost + ":" + imapPort)
+  console.log("[v0] Domain:", bareDomain, "| Subdomain forwarded:", isSubdomainOfSukospot, "| Connecting to:", imapUser || "(EMPTY)")
 
   if (!imapUser || !imapPass) {
     return NextResponse.json(
@@ -268,7 +275,7 @@ export async function GET(request: NextRequest) {
     let userMessage: string
     const lowerMsg = errorMessage.toLowerCase()
     if (lowerMsg.includes("login") || lowerMsg.includes("auth") || lowerMsg.includes("credentials") || lowerMsg.includes("no")) {
-      userMessage = `Falha na autenticacao IMAP. Verifique IMAP_CENTRAL_USER e IMAP_CENTRAL_PASS. (${errorMessage})`
+      userMessage = `Falha na autenticacao IMAP para ${bareDomain}. Verifique usuario/senha. (${errorMessage})`
     } else if (lowerMsg.includes("timeout") || lowerMsg.includes("timed out")) {
       userMessage = `Timeout ao conectar ao servidor IMAP (${imapHost}:${imapPort}). Verifique IMAP_HOST e IMAP_PORT. (${errorMessage})`
     } else if (lowerMsg.includes("enotfound") || lowerMsg.includes("getaddrinfo") || lowerMsg.includes("econnrefused")) {
