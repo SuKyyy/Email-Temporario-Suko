@@ -1,7 +1,27 @@
 "use client"
 
-import { useState } from "react"
-import { ChevronDown, Clock, Mail, MailOpen, RefreshCw, User } from "lucide-react"
+import { useState, useRef, useEffect } from "react"
+import {
+  ChevronDown,
+  Clock,
+  Download,
+  FileText,
+  Image as ImageIcon,
+  Loader2,
+  Mail,
+  MailOpen,
+  Paperclip,
+  RefreshCw,
+  User,
+} from "lucide-react"
+import DOMPurify from "dompurify"
+
+export interface Attachment {
+  filename: string
+  contentType: string
+  size: number
+  content: string // base64
+}
 
 export interface Email {
   id: string
@@ -9,6 +29,7 @@ export interface Email {
   subject: string
   date: string
   body: string
+  attachments?: Attachment[]
 }
 
 interface InboxProps {
@@ -17,9 +38,103 @@ interface InboxProps {
   activeDomain: string | null
   hasSearched: boolean
   isRefreshing: boolean
+  isPolling: boolean
   statusMessage: string | null
   countdown: number
   onRefresh: () => void
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes === 0) return "0 B"
+  const k = 1024
+  const sizes = ["B", "KB", "MB"]
+  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`
+}
+
+function getFileIcon(contentType: string) {
+  if (contentType.startsWith("image/")) return ImageIcon
+  return FileText
+}
+
+function downloadAttachment(att: Attachment) {
+  const byteChars = atob(att.content)
+  const byteNumbers = new Array(byteChars.length)
+  for (let i = 0; i < byteChars.length; i++) {
+    byteNumbers[i] = byteChars.charCodeAt(i)
+  }
+  const byteArray = new Uint8Array(byteNumbers)
+  const blob = new Blob([byteArray], { type: att.contentType })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement("a")
+  a.href = url
+  a.download = att.filename
+  document.body.appendChild(a)
+  a.click()
+  document.body.removeChild(a)
+  URL.revokeObjectURL(url)
+}
+
+function SanitizedHtml({ html }: { html: string }) {
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!containerRef.current) return
+    const clean = DOMPurify.sanitize(html, {
+      ADD_TAGS: ["style"],
+      ADD_ATTR: ["target", "style"],
+      ALLOW_DATA_ATTR: false,
+    })
+    containerRef.current.innerHTML = clean
+
+    // Open links in new tab
+    const links = containerRef.current.querySelectorAll("a")
+    links.forEach((link) => {
+      link.setAttribute("target", "_blank")
+      link.setAttribute("rel", "noopener noreferrer")
+    })
+  }, [html])
+
+  return (
+    <div
+      ref={containerRef}
+      className="prose prose-invert prose-sm max-w-none text-sm leading-relaxed text-card-foreground/80 [&_img]:max-w-full [&_img]:rounded-md [&_a]:text-accent [&_a]:underline"
+    />
+  )
+}
+
+function AttachmentList({ attachments }: { attachments: Attachment[] }) {
+  if (!attachments.length) return null
+
+  return (
+    <div className="mt-3 border-t border-border pt-3">
+      <div className="mb-2 flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+        <Paperclip className="h-3 w-3" />
+        {attachments.length} anexo{attachments.length > 1 ? "s" : ""}
+      </div>
+      <div className="flex flex-col gap-2">
+        {attachments.map((att, i) => {
+          const Icon = getFileIcon(att.contentType)
+          return (
+            <button
+              key={i}
+              onClick={() => downloadAttachment(att)}
+              className="flex items-center gap-3 rounded-lg border border-border bg-secondary/50 px-3 py-2 text-left transition-colors hover:bg-secondary"
+            >
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary/20">
+                <Icon className="h-4 w-4 text-primary" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-xs font-medium text-card-foreground">{att.filename}</p>
+                <p className="text-[11px] text-muted-foreground">{formatBytes(att.size)}</p>
+              </div>
+              <Download className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
 }
 
 function EmptyState({ hasSearched }: { hasSearched: boolean }) {
@@ -42,6 +157,7 @@ function EmptyState({ hasSearched }: { hasSearched: boolean }) {
 
 function EmailItem({ email }: { email: Email }) {
   const [expanded, setExpanded] = useState(false)
+  const hasAttachments = email.attachments && email.attachments.length > 0
 
   return (
     <div className="border-b border-border last:border-b-0">
@@ -61,7 +177,8 @@ function EmailItem({ email }: { email: Email }) {
         <div className="min-w-0 flex-1">
           <div className="flex items-center justify-between gap-2">
             <span className="truncate text-sm font-semibold text-card-foreground">{email.from}</span>
-            <div className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
+            <div className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground">
+              {hasAttachments && <Paperclip className="h-3 w-3" />}
               <Clock className="h-3 w-3" />
               <span>{email.date}</span>
             </div>
@@ -76,16 +193,25 @@ function EmailItem({ email }: { email: Email }) {
 
       {expanded && (
         <div className="border-t border-border bg-secondary/30 px-5 py-4">
-          <div className="prose prose-invert prose-sm max-w-none text-sm leading-relaxed text-card-foreground/80">
-            <div dangerouslySetInnerHTML={{ __html: email.body }} />
-          </div>
+          <SanitizedHtml html={email.body} />
+          {hasAttachments && <AttachmentList attachments={email.attachments!} />}
         </div>
       )}
     </div>
   )
 }
 
-export function Inbox({ emails, activeEmail, activeDomain, hasSearched, isRefreshing, statusMessage, countdown, onRefresh }: InboxProps) {
+export function Inbox({
+  emails,
+  activeEmail,
+  activeDomain,
+  hasSearched,
+  isRefreshing,
+  isPolling,
+  statusMessage,
+  countdown,
+  onRefresh,
+}: InboxProps) {
   return (
     <div className="overflow-hidden rounded-xl border border-border bg-card shadow-lg">
       <div className="flex items-center gap-3 border-b border-border px-5 py-3">
@@ -107,11 +233,20 @@ export function Inbox({ emails, activeEmail, activeDomain, hasSearched, isRefres
               <span className="text-xs text-muted-foreground">{statusMessage}</span>
             ) : (
               <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <span className="relative flex h-1.5 w-1.5">
-                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-accent opacity-60" />
-                  <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-accent" />
-                </span>
-                Atualiza em {countdown}s
+                {isPolling ? (
+                  <>
+                    <Loader2 className="h-3 w-3 animate-spin text-accent" />
+                    <span>Verificando...</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="relative flex h-1.5 w-1.5">
+                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-accent opacity-60" />
+                      <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-accent" />
+                    </span>
+                    Atualiza em {countdown}s
+                  </>
+                )}
               </span>
             )}
             <button

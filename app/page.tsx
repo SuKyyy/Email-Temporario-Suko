@@ -1,11 +1,47 @@
 "use client"
 
 import { useState, useCallback, useEffect, useRef } from "react"
+import { toast } from "sonner"
 import { SiteHeader } from "@/components/site-header"
 import { EmailInput, ROOT_DOMAINS, isSupportedDomain } from "@/components/email-input"
 import { Inbox, type Email } from "@/components/inbox"
 
 const POLL_SECONDS = 10
+
+// Generate a short notification sound using Web Audio API
+function playNotificationSound() {
+  try {
+    const ctx = new AudioContext()
+    const osc = ctx.createOscillator()
+    const gain = ctx.createGain()
+    osc.connect(gain)
+    gain.connect(ctx.destination)
+    osc.type = "sine"
+    osc.frequency.setValueAtTime(880, ctx.currentTime)
+    osc.frequency.setValueAtTime(1100, ctx.currentTime + 0.08)
+    gain.gain.setValueAtTime(0.15, ctx.currentTime)
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3)
+    osc.start(ctx.currentTime)
+    osc.stop(ctx.currentTime + 0.3)
+  } catch {
+    // Audio not supported or blocked
+  }
+}
+
+function requestNotificationPermission() {
+  if (typeof window !== "undefined" && "Notification" in window && Notification.permission === "default") {
+    Notification.requestPermission()
+  }
+}
+
+function showBrowserNotification(subject: string, from: string) {
+  if (typeof window !== "undefined" && "Notification" in window && Notification.permission === "granted") {
+    new Notification("Novo email recebido!", {
+      body: `De: ${from}\n${subject}`,
+      icon: "/favicon.ico",
+    })
+  }
+}
 
 export default function Page() {
   const [email, setEmail] = useState("")
@@ -13,6 +49,7 @@ export default function Page() {
   const [emails, setEmails] = useState<Email[]>([])
   const [loading, setLoading] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
+  const [isPolling, setIsPolling] = useState(false)
   const [activeUser, setActiveUser] = useState<string | null>(null)
   const [activeDomain, setActiveDomain] = useState<string | null>(null)
   const [hasSearched, setHasSearched] = useState(false)
@@ -29,6 +66,11 @@ export default function Page() {
   useEffect(() => { activeDomainRef.current = activeDomain }, [activeDomain])
   useEffect(() => { emailsRef.current = emails }, [emails])
 
+  // Ask for notification permission once
+  useEffect(() => {
+    requestNotificationPermission()
+  }, [])
+
   const fetchEmails = useCallback(async (user: string, domain: string) => {
     const res = await fetch(
       `/api/check-mail?user=${encodeURIComponent(user)}&domain=${encodeURIComponent(domain)}`
@@ -40,6 +82,23 @@ export default function Page() {
     return data.emails as Email[]
   }, [])
 
+  // Check for new emails and notify
+  const checkForNewEmails = useCallback((prev: Email[], next: Email[]) => {
+    const prevIds = new Set(prev.map((e) => e.id))
+    const newEmails = next.filter((e) => !prevIds.has(e.id))
+
+    if (newEmails.length > 0) {
+      playNotificationSound()
+      const first = newEmails[0]
+      showBrowserNotification(first.subject, first.from)
+      toast.success(`${newEmails.length} novo${newEmails.length > 1 ? "s" : ""} email${newEmails.length > 1 ? "s" : ""}!`, {
+        description: first.subject,
+      })
+    }
+
+    return newEmails.length > 0
+  }, [])
+
   // Auto-poll: countdown every second, fetch when it reaches 0
   useEffect(() => {
     if (!activeUser || !activeDomain) return
@@ -49,23 +108,24 @@ export default function Page() {
     const interval = setInterval(() => {
       setCountdown((prev) => {
         if (prev <= 1) {
-          // Trigger background fetch at 0
           if (!fetchingRef.current && activeUserRef.current && activeDomainRef.current) {
             fetchingRef.current = true
+            setIsPolling(true)
             fetchEmails(activeUserRef.current, activeDomainRef.current)
               .then((result) => {
-                // Only update if emails actually changed (prevents flicker)
                 const currentIds = emailsRef.current.map((e) => e.id).join(",")
                 const newIds = result.map((e) => e.id).join(",")
                 if (currentIds !== newIds) {
+                  checkForNewEmails(emailsRef.current, result)
                   setEmails(result)
                 }
               })
               .catch(() => {
-                // Silent fail on background poll — don't interrupt the user
+                // Silent fail on background poll
               })
               .finally(() => {
                 fetchingRef.current = false
+                setIsPolling(false)
               })
           }
           return POLL_SECONDS
@@ -75,7 +135,7 @@ export default function Page() {
     }, 1000)
 
     return () => clearInterval(interval)
-  }, [activeUser, activeDomain, fetchEmails])
+  }, [activeUser, activeDomain, fetchEmails, checkForNewEmails])
 
   const handleCheckMail = useCallback(async () => {
     const trimmed = email.trim()
@@ -132,6 +192,7 @@ export default function Page() {
     try {
       const result = await fetchEmails(activeUser, activeDomain)
       setRefreshing(false)
+      checkForNewEmails(emails, result)
       setEmails(result)
       setStatusMessage("Caixa de entrada atualizada")
       setTimeout(() => setStatusMessage(null), 3000)
@@ -140,12 +201,14 @@ export default function Page() {
       setStatusMessage(err instanceof Error ? err.message : "Erro ao atualizar.")
       setTimeout(() => setStatusMessage(null), 5000)
     }
-  }, [activeUser, activeDomain, fetchEmails])
+  }, [activeUser, activeDomain, fetchEmails, emails, checkForNewEmails])
 
   const handleEmailChange = useCallback((value: string) => {
     setEmail(value)
     if (error) setError(null)
   }, [error])
+
+  const activeAddress = activeUser && activeDomain ? `${activeUser}${activeDomain}` : null
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -165,6 +228,7 @@ export default function Page() {
           <EmailInput
             email={email}
             error={error}
+            activeAddress={activeAddress}
             onEmailChange={handleEmailChange}
             onSubmit={handleCheckMail}
             loading={loading}
@@ -176,6 +240,7 @@ export default function Page() {
             activeDomain={activeDomain}
             hasSearched={hasSearched}
             isRefreshing={refreshing}
+            isPolling={isPolling}
             statusMessage={statusMessage}
             countdown={countdown}
             onRefresh={handleManualRefresh}

@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next'
 import { Inter, Space_Mono } from 'next/font/google'
+import { Toaster } from 'sonner'
 
 import './globals.css'
 
@@ -22,7 +23,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="pt-BR" suppressHydrationWarning>
-      <body suppressHydrationWarning className={`${_inter.variable} ${_spaceMono.variable} font-sans antialiased`}>{children}</body>
+      <body suppressHydrationWarning className={`${_inter.variable} ${_spaceMono.variable} font-sans antialiased`}>
+        {children}
+        <Toaster theme="dark" position="top-right" richColors closeButton />
+      </body>
     </html>
   )
 }

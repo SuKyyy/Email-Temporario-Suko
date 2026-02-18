@@ -59,12 +59,6 @@ export async function GET(request: NextRequest) {
   const imapHost = process.env.IMAP_HOST || "imap.titan.email"
   const imapPort = parseInt(process.env.IMAP_PORT || "993", 10)
 
-  // Diagnostic: log env var status (never log passwords)
-  console.log("[v0] ENV CHECK - IMAP_CENTRAL_USER:", centralUser ? `"${centralUser}"` : "(EMPTY/UNDEFINED)")
-  console.log("[v0] ENV CHECK - IMAP_CENTRAL_PASS:", centralPass ? `(set, ${centralPass.length} chars)` : "(EMPTY/UNDEFINED)")
-  console.log("[v0] ENV CHECK - IMAP_HOST:", imapHost)
-  console.log("[v0] ENV CHECK - IMAP_PORT:", imapPort)
-
   if (!centralUser || !centralPass) {
     return NextResponse.json(
       {
@@ -76,8 +70,6 @@ export async function GET(request: NextRequest) {
 
   // The full address the user wants to check — Cloudflare preserves this in the TO header
   const fullAddress = `${user}${normalizedDomain}`
-
-  console.log("[v0] IMAP lookup - host:", imapHost, "port:", imapPort, "central_user:", centralUser, "target_to:", fullAddress)
 
   let connection: Awaited<ReturnType<typeof imapSimple.connect>> | null = null
 
@@ -123,12 +115,21 @@ export async function GET(request: NextRequest) {
           const date = parsed.date ? formatRelativeTime(parsed.date) : "Desconhecido"
           const body = parsed.html || parsed.textAsHtml || `<p>${parsed.text || "Sem conteudo"}</p>`
 
+          // Extract attachments
+          const attachments = (parsed.attachments || []).map((att) => ({
+            filename: att.filename || "attachment",
+            contentType: att.contentType || "application/octet-stream",
+            size: att.size || 0,
+            content: att.content.toString("base64"),
+          }))
+
           return {
             id: parsed.messageId || `msg-${index}`,
             from: fromName,
             subject,
             date,
             body,
+            attachments,
           }
         } catch {
           return {
@@ -137,6 +138,7 @@ export async function GET(request: NextRequest) {
             subject: "(Nao foi possivel processar o email)",
             date: "Desconhecido",
             body: "<p>Este email nao pode ser processado.</p>",
+            attachments: [],
           }
         }
       })
