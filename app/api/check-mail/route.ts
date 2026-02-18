@@ -11,33 +11,6 @@ const SUPPORTED_DOMAINS = [
 
 type SupportedDomain = (typeof SUPPORTED_DOMAINS)[number]
 
-function getCredentials(domain: SupportedDomain): { user: string; password: string } | null {
-  switch (domain) {
-    case "@sukospot.shop":
-      return {
-        user: process.env.IMAP_USER_SUKOSPOT || "",
-        password: process.env.IMAP_PASS_SUKOSPOT || "",
-      }
-    case "@sukodocursor.shop":
-      return {
-        user: process.env.IMAP_USER_CURSOR || "",
-        password: process.env.IMAP_PASS_CURSOR || "",
-      }
-    case "@sukoultra.shop":
-      return {
-        user: process.env.IMAP_USER_ULTRA || "",
-        password: process.env.IMAP_PASS_ULTRA || "",
-      }
-    case "@sukov0dev.shop":
-      return {
-        user: process.env.IMAP_USER_V0 || "",
-        password: process.env.IMAP_PASS_V0 || "",
-      }
-    default:
-      return null
-  }
-}
-
 function formatRelativeTime(date: Date): string {
   const now = Date.now()
   const diffMs = now - date.getTime()
@@ -58,8 +31,6 @@ export async function GET(request: NextRequest) {
   const user = searchParams.get("user")
   const rawDomain = searchParams.get("domain")
 
-  console.log("[v0] Raw query params - user:", user, "domain:", rawDomain)
-
   if (!user || !rawDomain) {
     return NextResponse.json(
       { error: "Parametros 'user' e 'domain' sao obrigatorios" },
@@ -67,51 +38,48 @@ export async function GET(request: NextRequest) {
     )
   }
 
-  // Normalize domain: ensure it starts with "@" whether passed as "@sukospot.shop" or "sukospot.shop"
+  // Normalize domain: ensure it starts with "@"
   const normalizedDomain = (rawDomain.startsWith("@") ? rawDomain : `@${rawDomain}`) as SupportedDomain
 
-  console.log("[v0] Normalized domain:", normalizedDomain)
-
   if (!SUPPORTED_DOMAINS.includes(normalizedDomain)) {
-    console.log("[v0] Domain not in supported list. Supported:", SUPPORTED_DOMAINS)
     return NextResponse.json({ error: `Dominio nao suportado: ${normalizedDomain}` }, { status: 400 })
   }
 
-  const credentials = getCredentials(normalizedDomain)
+  // Central inbox credentials — all domains are forwarded here via Cloudflare Email Routing
+  const centralUser = process.env.IMAP_CENTRAL_USER || ""
+  const centralPass = process.env.IMAP_CENTRAL_PASS || ""
+  const imapHost = process.env.IMAP_HOST || "imap.titan.email"
+  const imapPort = parseInt(process.env.IMAP_PORT || "993", 10)
 
-  console.log("[v0] Credentials lookup for", normalizedDomain, "- user env:", credentials?.user ? "(set)" : "(EMPTY)", "- pass env:", credentials?.password ? "(set)" : "(EMPTY)")
-
-  if (!credentials || !credentials.user || !credentials.password) {
-    console.log("[v0] Missing credentials. Check that env vars are set for domain:", normalizedDomain)
+  if (!centralUser || !centralPass) {
+    console.error("[v0] Central IMAP credentials missing. Set IMAP_CENTRAL_USER and IMAP_CENTRAL_PASS.")
     return NextResponse.json(
-      { error: `Dominio nao configurado no sistema: ${normalizedDomain}` },
+      { error: "Credenciais do servidor de email nao configuradas." },
       { status: 500 }
     )
   }
 
-  const imapHost = process.env.IMAP_HOST || "imap.titan.email"
+  // The full address the user wants to check — Cloudflare preserves this in the TO header
   const fullAddress = `${user}${normalizedDomain}`
 
-  console.log("[v0] IMAP connection attempt - host:", imapHost, "port: 993", "tls: true", "imap_user:", credentials.user, "target_address:", fullAddress)
+  console.log("[v0] IMAP lookup - host:", imapHost, "port:", imapPort, "central_user:", centralUser, "target_to:", fullAddress)
 
   let connection: Awaited<ReturnType<typeof imapSimple.connect>> | null = null
 
   try {
     const config = {
       imap: {
-        user: credentials.user,
-        password: credentials.password,
+        user: centralUser,
+        password: centralPass,
         host: imapHost,
-        port: 993,
+        port: imapPort,
         tls: true,
         authTimeout: 10000,
         tlsOptions: { rejectUnauthorized: false },
       },
     }
 
-    console.log("[v0] Connecting to IMAP server...")
     connection = await imapSimple.connect(config)
-    console.log("[v0] IMAP connected successfully")
     await connection.openBox("INBOX")
 
     const searchCriteria = [["TO", fullAddress]]
