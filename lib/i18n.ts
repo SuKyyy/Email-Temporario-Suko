@@ -1,4 +1,4 @@
-export const locales = ["en", "pt", "ru", "es", "ja", "zh", "de", "fr", "tr", "ko"] as const
+export const locales = ["en", "pt", "ru"] as const
 export type Locale = (typeof locales)[number]
 export const defaultLocale: Locale = "en"
 
@@ -6,55 +6,55 @@ export function isValidLocale(value: string): value is Locale {
   return locales.includes(value as Locale)
 }
 
-const htmlLangMap: Record<string, string> = {
-  en: "en",
-  pt: "pt-BR",
-  ru: "ru",
-  es: "es",
-  ja: "ja",
-  zh: "zh-CN",
-  de: "de",
-  fr: "fr",
-  tr: "tr",
-  ko: "ko",
+/** Map Vercel geo country codes to our supported locales */
+export function countryToLocale(country: string): Locale {
+  const map: Record<string, Locale> = {
+    BR: "pt",
+    PT: "pt",
+    AO: "pt",
+    MZ: "pt",
+    CV: "pt",
+    GW: "pt",
+    TL: "pt",
+    ST: "pt",
+    RU: "ru",
+    BY: "ru",
+    KZ: "ru",
+    KG: "ru",
+    TJ: "ru",
+  }
+  return map[country.toUpperCase()] ?? "en"
 }
 
+/** Parse Accept-Language header to find best matching locale */
+export function acceptLanguageToLocale(header: string): Locale {
+  const segments = header.split(",").map((s) => s.trim().split(";")[0].trim().toLowerCase())
+  for (const seg of segments) {
+    if (seg.startsWith("pt")) return "pt"
+    if (seg.startsWith("ru")) return "ru"
+    if (seg.startsWith("en")) return "en"
+  }
+  return defaultLocale
+}
+
+const dictionaries = {
+  en: () => import("@/dictionaries/en.json").then((m) => m.default),
+  pt: () => import("@/dictionaries/pt.json").then((m) => m.default),
+  ru: () => import("@/dictionaries/ru.json").then((m) => m.default),
+}
+
+export async function getDictionary(locale: string) {
+  const loader = dictionaries[locale as Locale]
+  if (!loader) return dictionaries.en()
+  return loader()
+}
+
+/** Full BCP-47 lang tag for the <html> element */
 export function localeToHtmlLang(locale: string): string {
-  return htmlLangMap[locale] ?? "en"
+  const map: Record<string, string> = { en: "en", pt: "pt-BR", ru: "ru" }
+  return map[locale] ?? "en"
 }
 
-export type Dictionary = {
-  header: { brand: string; selectLanguage: string; supplier_prices: string }
-  hero: { title: string; subtitle: string }
-  emailInput: {
-    heading: string; description: string; placeholder: string; ariaLabel: string
-    copyAriaLabel: string; accessAriaLabel: string; loading: string; submit: string
-    copiedToast: string; copyErrorToast: string
-  }
-  inbox: {
-    title: string; checking: string; updatesIn: string; seconds: string
-    refreshAriaLabel: string; refreshing: string; refresh: string; warning: string
-    searching: string; attachment: string; attachments: string; noEmailsFound: string
-    noEmailSelected: string; emptyInbox: string; enterEmailPrompt: string
-  }
-  notifications: {
-    newEmailBrowser: string; from: string; newEmailToastOne: string; newEmailToastMany: string
-  }
-  errors: {
-    invalidFormat: string; noUsername: string; unsupportedDomain: string
-    fetchError: string; genericError: string; updateError: string
-  }
-  status: { inboxUpdated: string; checkingNewEmails: string }
-  footer: { text: string }
-  metadata: { title: string; description: string }
-}
-
-export async function getDictionary(locale: string): Promise<Dictionary> {
-  try {
-    const dict = await import(`@/dictionaries/${locale}.json`)
-    return dict.default as Dictionary
-  } catch {
-    const dict = await import(`@/dictionaries/en.json`)
-    return dict.default as Dictionary
-  }
-}
+// Re-export the dictionary type from the English JSON (single source of truth)
+import type enDict from "@/dictionaries/en.json"
+export type Dictionary = typeof enDict
