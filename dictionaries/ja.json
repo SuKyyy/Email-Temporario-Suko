@@ -1,7 +1,8 @@
 {
   "header": {
     "brand": "SuKo Shop",
-    "selectLanguage": "言語を選択"
+    "selectLanguage": "言語を選択",
+    "supplier_prices": "仕入れ価格"
   },
   "hero": {
     "title": "SuKo 使い捨てメール",

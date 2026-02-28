@@ -1,7 +1,8 @@
 {
   "header": {
     "brand": "SuKo Shop",
-    "selectLanguage": "Selecionar idioma"
+    "selectLanguage": "Selecionar idioma",
+    "supplier_prices": "Pre\u00e7os de Fornecedor"
   },
   "hero": {
     "title": "Email Temporario SuKo",

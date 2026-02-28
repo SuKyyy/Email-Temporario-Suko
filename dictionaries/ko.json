@@ -1,7 +1,8 @@
 {
   "header": {
     "brand": "SuKo Shop",
-    "selectLanguage": "언어 선택"
+    "selectLanguage": "언어 선택",
+    "supplier_prices": "공급업체 가격"
   },
   "hero": {
     "title": "SuKo 임시 이메일",

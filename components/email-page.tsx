@@ -225,7 +225,7 @@ export function EmailPage({ dict, lang }: EmailPageProps) {
 
   return (
     <div className="flex min-h-screen flex-col">
-      <SiteHeader lang={lang} />
+      <SiteHeader lang={lang} dict={dict} />
 
       <main className="flex flex-1 items-start justify-center px-4 py-12 sm:py-20">
         <div className="w-full max-w-2xl space-y-6">

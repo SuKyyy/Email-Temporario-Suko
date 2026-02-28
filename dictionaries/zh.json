@@ -1,7 +1,8 @@
 {
   "header": {
     "brand": "SuKo Shop",
-    "selectLanguage": "选择语言"
+    "selectLanguage": "选择语言",
+    "supplier_prices": "供应商价格"
   },
   "hero": {
     "title": "SuKo 临时邮箱",

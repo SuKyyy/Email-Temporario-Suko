@@ -1,7 +1,8 @@
 {
   "header": {
     "brand": "SuKo Shop",
-    "selectLanguage": "Dil seçin"
+    "selectLanguage": "Dil seçin",
+    "supplier_prices": "Tedarikçi Fiyatları"
   },
   "hero": {
     "title": "SuKo Geçici E-posta",
