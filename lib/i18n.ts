@@ -113,6 +113,5 @@ export function localeToHtmlLang(locale: string): string {
   return map[locale] ?? "en"
 }
 
-// Re-export the dictionary type from the English JSON (single source of truth)
-import type enDict from "@/dictionaries/en.json"
-export type Dictionary = typeof enDict
+// Export the dictionary type derived from getDictionary's return value
+export type Dictionary = Awaited<ReturnType<typeof getDictionary>>

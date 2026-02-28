@@ -35,7 +35,7 @@
     "noEmailsFound": "Aucun e-mail trouvé",
     "noEmailSelected": "Aucun e-mail sélectionné",
     "emptyInbox": "Votre boîte de réception est vide. Les nouveaux messages apparaîtront ici automatiquement.",
-    "enterEmailPrompt": "Entrez un e-mail ci-dessus et cliquez sur 'Accéder à l'e-mail' pour vérifier votre boîte de réception."
+    "enterEmailPrompt": "Entrez un e-mail ci-dessus et cliquez sur \u00abAcc\u00e9der \u00e0 l\u2019e-mail\u00bb pour v\u00e9rifier votre bo\u00eete de r\u00e9ception."
   },
   "notifications": {
     "newEmailBrowser": "Nouvel e-mail reçu !",
