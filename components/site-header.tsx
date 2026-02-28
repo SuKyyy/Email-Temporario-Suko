@@ -6,7 +6,7 @@ import { ChevronDown, Globe } from "lucide-react"
 
 const languages = [
   { code: "en", label: "English" },
-  { code: "pt", label: "Portugues" },
+  { code: "pt", label: "Portugu\u00eas" },
   { code: "ru", label: "\u0420\u0443\u0441\u0441\u043a\u0438\u0439" },
 ]
 
