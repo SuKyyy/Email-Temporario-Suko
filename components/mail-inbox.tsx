@@ -14,6 +14,7 @@ import {
   RefreshCw,
   User,
 } from "lucide-react"
+import type { Dictionary } from "@/lib/i18n"
 
 export interface Attachment {
   filename: string
@@ -42,6 +43,7 @@ interface InboxProps {
   statusMessage: string | null
   countdown: number
   onRefresh: () => void
+  dict: Dictionary
 }
 
 function formatBytes(bytes: number): string {
@@ -115,14 +117,14 @@ function SafeHtmlContent({ html }: { html: string }) {
   )
 }
 
-function AttachmentList({ attachments }: { attachments: Attachment[] }) {
+function AttachmentList({ attachments, dict }: { attachments: Attachment[]; dict: Dictionary }) {
   if (!attachments.length) return null
   return (
     <div className="mt-3 border-t border-border pt-3">
       <div className="mb-2 flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
         <Paperclip className="h-3 w-3" />
-        {attachments.length} {"anexo"}
-        {attachments.length > 1 ? "s" : ""}
+        {attachments.length}{" "}
+        {attachments.length > 1 ? dict.inbox.attachments : dict.inbox.attachment}
       </div>
       <div className="flex flex-col gap-2">
         {attachments.map((att, i) => {
@@ -153,25 +155,25 @@ function AttachmentList({ attachments }: { attachments: Attachment[] }) {
   )
 }
 
-function EmptyState({ hasSearched }: { hasSearched: boolean }) {
+function EmptyState({ hasSearched, dict }: { hasSearched: boolean; dict: Dictionary }) {
   return (
     <div className="flex flex-col items-center justify-center py-16 text-center">
       <div className="mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-secondary">
         <Mail className="h-10 w-10 text-muted-foreground" />
       </div>
       <h3 className="mb-1 text-lg font-semibold text-card-foreground">
-        {hasSearched ? "Nenhum email encontrado" : "Nenhum email selecionado"}
+        {hasSearched ? dict.inbox.noEmailsFound : dict.inbox.noEmailSelected}
       </h3>
       <p className="max-w-xs text-sm text-muted-foreground">
         {hasSearched
-          ? "Sua caixa de entrada esta vazia. Novas mensagens aparecerao aqui automaticamente."
-          : "Digite um email acima e clique em 'Acessar Email' para verificar sua caixa de entrada."}
+          ? dict.inbox.emptyInbox
+          : dict.inbox.enterEmailPrompt}
       </p>
     </div>
   )
 }
 
-function EmailItem({ email }: { email: Email }) {
+function EmailItem({ email, dict }: { email: Email; dict: Dictionary }) {
   const [expanded, setExpanded] = useState(false)
   const hasAttachments = email.attachments && email.attachments.length > 0
 
@@ -211,7 +213,7 @@ function EmailItem({ email }: { email: Email }) {
       {expanded && (
         <div className="border-t border-border bg-secondary/30 px-5 py-4">
           <SafeHtmlContent html={email.body} />
-          {hasAttachments && <AttachmentList attachments={email.attachments!} />}
+          {hasAttachments && <AttachmentList attachments={email.attachments!} dict={dict} />}
         </div>
       )}
     </div>
@@ -229,12 +231,13 @@ export function Inbox({
   statusMessage,
   countdown,
   onRefresh,
+  dict,
 }: InboxProps) {
   return (
     <div className="overflow-hidden rounded-xl border border-border bg-card shadow-lg">
       <div className="flex items-center gap-3 border-b border-border px-5 py-3">
         <h3 className="text-sm font-semibold text-card-foreground">
-          Caixa de Entrada
+          {dict.inbox.title}
         </h3>
         {activeEmail && activeDomain && (
           <span className="rounded-full bg-secondary px-3 py-0.5 font-mono text-xs text-muted-foreground">
@@ -258,7 +261,7 @@ export function Inbox({
                 {isPolling ? (
                   <>
                     <Loader2 className="h-3 w-3 animate-spin text-accent" />
-                    <span>Verificando...</span>
+                    <span>{dict.inbox.checking}</span>
                   </>
                 ) : (
                   <>
@@ -266,9 +269,9 @@ export function Inbox({
                       <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-accent opacity-60" />
                       <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-accent" />
                     </span>
-                    {"Atualiza em "}
+                    {`${dict.inbox.updatesIn} `}
                     {countdown}
-                    {"s"}
+                    {dict.inbox.seconds}
                   </>
                 )}
               </span>
@@ -277,13 +280,13 @@ export function Inbox({
               onClick={onRefresh}
               disabled={isRefreshing}
               className="flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1 text-xs text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
-              aria-label="Atualizar caixa de entrada"
+              aria-label={dict.inbox.refreshAriaLabel}
             >
               <RefreshCw
                 className={`h-3.5 w-3.5 ${isRefreshing ? "animate-spin" : ""}`}
               />
               <span className="hidden sm:inline">
-                {isRefreshing ? "Atualizando..." : "Atualizar"}
+                {isRefreshing ? dict.inbox.refreshing : dict.inbox.refresh}
               </span>
             </button>
           </div>
@@ -296,9 +299,7 @@ export function Inbox({
             {"⚠"}
           </span>
           <p className="text-xs leading-relaxed text-amber-200/80">
-            Emails podem levar de 15 a 30 segundos para chegar devido ao
-            processamento do servidor. Se nao encontrar, aguarde um momento e
-            clique em Atualizar.
+            {dict.inbox.warning}
           </p>
         </div>
       )}
@@ -306,14 +307,14 @@ export function Inbox({
       {isLoading ? (
         <div className="flex flex-col items-center justify-center py-16 text-center">
           <Loader2 className="mb-4 h-10 w-10 animate-spin text-muted-foreground" />
-          <p className="text-sm text-muted-foreground">Buscando emails...</p>
+          <p className="text-sm text-muted-foreground">{dict.inbox.searching}</p>
         </div>
       ) : emails.length === 0 ? (
-        <EmptyState hasSearched={hasSearched} />
+        <EmptyState hasSearched={hasSearched} dict={dict} />
       ) : (
         <div className="divide-y divide-border">
           {emails.map((email) => (
-            <EmailItem key={email.id} email={email} />
+            <EmailItem key={email.id} email={email} dict={dict} />
           ))}
         </div>
       )}
