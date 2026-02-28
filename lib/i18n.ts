@@ -1,59 +1,52 @@
+import enDict from "@/dictionaries/en.json"
+import ptDict from "@/dictionaries/pt.json"
+import ruDict from "@/dictionaries/ru.json"
+import esDict from "@/dictionaries/es.json"
+import jaDict from "@/dictionaries/ja.json"
+import zhDict from "@/dictionaries/zh.json"
+import deDict from "@/dictionaries/de.json"
+import frDict from "@/dictionaries/fr.json"
+import trDict from "@/dictionaries/tr.json"
+import koDict from "@/dictionaries/ko.json"
+
 export const locales = ["en", "pt", "ru", "es", "ja", "zh", "de", "fr", "tr", "ko"] as const
 export type Locale = (typeof locales)[number]
 export const defaultLocale: Locale = "en"
+
+export type Dictionary = typeof enDict
 
 export function isValidLocale(value: string): value is Locale {
   return locales.includes(value as Locale)
 }
 
+const dictionaries: Record<string, Dictionary> = {
+  en: enDict,
+  pt: ptDict,
+  ru: ruDict,
+  es: esDict,
+  ja: jaDict,
+  zh: zhDict,
+  de: deDict,
+  fr: frDict,
+  tr: trDict,
+  ko: koDict,
+}
+
+export function getDictionary(locale: string): Dictionary {
+  return dictionaries[locale] ?? dictionaries.en
+}
+
 /** Map Vercel geo country codes to our supported locales */
 export function countryToLocale(country: string): Locale {
   const map: Record<string, Locale> = {
-    // Portuguese
-    BR: "pt",
-    PT: "pt",
-    AO: "pt",
-    MZ: "pt",
-    CV: "pt",
-    GW: "pt",
-    TL: "pt",
-    ST: "pt",
-    // Russian
-    RU: "ru",
-    BY: "ru",
-    KZ: "ru",
-    KG: "ru",
-    TJ: "ru",
-    // Spanish
-    ES: "es",
-    MX: "es",
-    AR: "es",
-    CO: "es",
-    CL: "es",
-    PE: "es",
-    VE: "es",
-    EC: "es",
-    // Japanese
+    BR: "pt", PT: "pt", AO: "pt", MZ: "pt", CV: "pt", GW: "pt", TL: "pt", ST: "pt",
+    RU: "ru", BY: "ru", KZ: "ru", KG: "ru", TJ: "ru",
+    ES: "es", MX: "es", AR: "es", CO: "es", CL: "es", PE: "es", VE: "es", EC: "es",
     JP: "ja",
-    // Chinese
-    CN: "zh",
-    TW: "zh",
-    HK: "zh",
-    SG: "zh",
-    // German
-    DE: "de",
-    AT: "de",
-    CH: "de",
-    // French
-    FR: "fr",
-    BE: "fr",
-    CA: "fr",
-    SN: "fr",
-    CI: "fr",
-    // Turkish
-    TR: "tr",
-    CY: "tr",
-    // Korean
+    CN: "zh", TW: "zh", HK: "zh", SG: "zh",
+    DE: "de", AT: "de", CH: "de",
+    FR: "fr", BE: "fr", CA: "fr", SN: "fr", CI: "fr",
+    TR: "tr", CY: "tr",
     KR: "ko",
   }
   return map[country.toUpperCase()] ?? "en"
@@ -77,25 +70,6 @@ export function acceptLanguageToLocale(header: string): Locale {
   return defaultLocale
 }
 
-const dictionaries = {
-  en: () => import("@/dictionaries/en.json").then((m) => m.default),
-  pt: () => import("@/dictionaries/pt.json").then((m) => m.default),
-  ru: () => import("@/dictionaries/ru.json").then((m) => m.default),
-  es: () => import("@/dictionaries/es.json").then((m) => m.default),
-  ja: () => import("@/dictionaries/ja.json").then((m) => m.default),
-  zh: () => import("@/dictionaries/zh.json").then((m) => m.default),
-  de: () => import("@/dictionaries/de.json").then((m) => m.default),
-  fr: () => import("@/dictionaries/fr.json").then((m) => m.default),
-  tr: () => import("@/dictionaries/tr.json").then((m) => m.default),
-  ko: () => import("@/dictionaries/ko.json").then((m) => m.default),
-}
-
-export async function getDictionary(locale: string) {
-  const loader = dictionaries[locale as Locale]
-  if (!loader) return dictionaries.en()
-  return loader()
-}
-
 /** Full BCP-47 lang tag for the <html> element */
 export function localeToHtmlLang(locale: string): string {
   const map: Record<string, string> = {
@@ -112,6 +86,3 @@ export function localeToHtmlLang(locale: string): string {
   }
   return map[locale] ?? "en"
 }
-
-// Export the dictionary type derived from getDictionary's return value
-export type Dictionary = Awaited<ReturnType<typeof getDictionary>>
