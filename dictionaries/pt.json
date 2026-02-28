@@ -1,0 +1,64 @@
+{
+  "header": {
+    "brand": "SuKo Shop",
+    "selectLanguage": "Selecionar idioma"
+  },
+  "hero": {
+    "title": "Email Temporario SuKo",
+    "subtitle": "Receba emails instantaneamente nos seus dominios."
+  },
+  "emailInput": {
+    "heading": "Acesse sua Caixa de Entrada",
+    "description": "Digite seu email completo para verificar sua caixa de entrada",
+    "placeholder": "Digite seu email (ex: kratos@sub.sukospot.shop)",
+    "ariaLabel": "Endereco de email completo",
+    "copyAriaLabel": "Copiar email",
+    "accessAriaLabel": "Acessar email",
+    "loading": "Carregando...",
+    "submit": "Acessar Email",
+    "copiedToast": "Email copiado para a area de transferencia!",
+    "copyErrorToast": "Nao foi possivel copiar."
+  },
+  "inbox": {
+    "title": "Caixa de Entrada",
+    "checking": "Verificando...",
+    "updatesIn": "Atualiza em",
+    "seconds": "s",
+    "refreshAriaLabel": "Atualizar caixa de entrada",
+    "refreshing": "Atualizando...",
+    "refresh": "Atualizar",
+    "warning": "Emails podem levar de 15 a 30 segundos para chegar devido ao processamento do servidor. Se nao encontrar, aguarde um momento e clique em Atualizar.",
+    "searching": "Buscando emails...",
+    "attachment": "anexo",
+    "attachments": "anexos",
+    "noEmailsFound": "Nenhum email encontrado",
+    "noEmailSelected": "Nenhum email selecionado",
+    "emptyInbox": "Sua caixa de entrada esta vazia. Novas mensagens aparecerao aqui automaticamente.",
+    "enterEmailPrompt": "Digite um email acima e clique em 'Acessar Email' para verificar sua caixa de entrada."
+  },
+  "notifications": {
+    "newEmailBrowser": "Novo email recebido!",
+    "from": "De",
+    "newEmailToastOne": "1 novo email!",
+    "newEmailToastMany": "{count} novos emails!"
+  },
+  "errors": {
+    "invalidFormat": "Formato de email invalido. Use usuario@dominio.sukospot.shop",
+    "noUsername": "Digite um nome de usuario antes do @",
+    "unsupportedDomain": "Dominio nao suportado. Use subdominos de:",
+    "fetchError": "Erro ao buscar emails. Tente novamente.",
+    "genericError": "Erro ao buscar emails.",
+    "updateError": "Erro ao atualizar."
+  },
+  "status": {
+    "inboxUpdated": "Caixa de entrada atualizada",
+    "checkingNewEmails": "Verificando novos emails..."
+  },
+  "footer": {
+    "text": "SuKo Shop \u00b7 Servico de email temporario \u00b7 Todas as mensagens sao excluidas automaticamente apos 24 horas"
+  },
+  "metadata": {
+    "title": "SuKo Shop - Email Temporario",
+    "description": "Acesse sua caixa de entrada temporaria nos dominios SuKo"
+  }
+}

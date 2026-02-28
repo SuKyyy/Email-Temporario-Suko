@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { Check, Copy, Loader2 } from "lucide-react"
 import { toast } from "sonner"
+import type { Dictionary } from "@/lib/i18n"
 
 // Root domains — any subdomain of these is also valid
 // e.g. @sub.sukospot.shop, @anything.sukoultra.shop
@@ -28,6 +29,7 @@ interface EmailInputProps {
   onEmailChange: (value: string) => void
   onSubmit: () => void
   loading: boolean
+  dict: Dictionary
 }
 
 export function EmailInput({
@@ -37,6 +39,7 @@ export function EmailInput({
   onEmailChange,
   onSubmit,
   loading,
+  dict,
 }: EmailInputProps) {
   const [copied, setCopied] = useState(false)
 
@@ -45,18 +48,18 @@ export function EmailInput({
     try {
       await navigator.clipboard.writeText(activeAddress)
       setCopied(true)
-      toast.success("Email copiado para a area de transferencia!")
+      toast.success(dict.emailInput.copiedToast)
       setTimeout(() => setCopied(false), 2000)
     } catch {
-      toast.error("Nao foi possivel copiar.")
+      toast.error(dict.emailInput.copyErrorToast)
     }
   }
 
   return (
     <div className="rounded-xl border border-border bg-card p-6 shadow-lg">
-      <h2 className="mb-1 text-xl font-bold text-card-foreground">Acesse sua Caixa de Entrada</h2>
+      <h2 className="mb-1 text-xl font-bold text-card-foreground">{dict.emailInput.heading}</h2>
       <p className="mb-5 text-sm text-muted-foreground">
-        Digite seu email completo para verificar sua caixa de entrada
+        {dict.emailInput.description}
       </p>
 
       <div className="flex flex-col gap-3 sm:flex-row">
@@ -69,11 +72,11 @@ export function EmailInput({
               onKeyDown={(e) => {
                 if (e.key === "Enter" && email.trim()) onSubmit()
               }}
-              placeholder="Digite seu email (ex: kratos@sub.sukospot.shop)"
+              placeholder={dict.emailInput.placeholder}
               className={`w-full rounded-lg border bg-secondary px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50 ${
                 error ? "border-destructive" : "border-border"
               }`}
-              aria-label="Endereco de email completo"
+              aria-label={dict.emailInput.ariaLabel}
               aria-invalid={!!error}
               aria-describedby={error ? "email-error" : undefined}
             />
@@ -81,8 +84,8 @@ export function EmailInput({
               <button
                 onClick={handleCopy}
                 className="flex h-[46px] w-[46px] shrink-0 items-center justify-center rounded-lg border border-border bg-secondary text-muted-foreground transition-colors hover:bg-secondary/80 hover:text-foreground"
-                aria-label="Copiar email"
-                title="Copiar email"
+                aria-label={dict.emailInput.copyAriaLabel}
+                title={dict.emailInput.copyAriaLabel}
               >
                 {copied ? (
                   <Check className="h-4 w-4 text-accent" />
@@ -103,15 +106,15 @@ export function EmailInput({
           onClick={onSubmit}
           disabled={!email.trim() || loading}
           className="flex shrink-0 items-center justify-center gap-2 rounded-lg bg-accent px-6 py-3 text-sm font-semibold text-accent-foreground transition-all hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-50"
-          aria-label="Acessar email"
+          aria-label={dict.emailInput.accessAriaLabel}
         >
           {loading ? (
             <>
               <Loader2 className="h-4 w-4 animate-spin" />
-              Carregando...
+              {dict.emailInput.loading}
             </>
           ) : (
-            "Acessar Email"
+            dict.emailInput.submit
           )}
         </button>
       </div>
