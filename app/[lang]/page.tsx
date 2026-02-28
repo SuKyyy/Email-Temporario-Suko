@@ -8,6 +8,6 @@ export default async function Page({
 }) {
   const { lang } = await params
   const locale = isValidLocale(lang) ? lang : defaultLocale
-  const dict = getDictionary(locale)
+  const dict = await getDictionary(locale)
   return <EmailPage dict={dict} lang={locale} />
 }

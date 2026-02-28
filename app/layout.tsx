@@ -1,9 +1,7 @@
 import type { Metadata, Viewport } from 'next'
 import { Inter, Space_Mono } from 'next/font/google'
-import { cookies } from 'next/headers'
 import { Toaster } from 'sonner'
 
-import { localeToHtmlLang } from '@/lib/i18n'
 import './globals.css'
 
 const _inter = Inter({ subsets: ['latin'], variable: '--font-inter' })
@@ -18,17 +16,13 @@ export const viewport: Viewport = {
   themeColor: '#6b46c1',
 }
 
-export default async function RootLayout({
+export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode
 }>) {
-  const cookieStore = await cookies()
-  const locale = cookieStore.get('NEXT_LOCALE')?.value || 'en'
-  const htmlLang = localeToHtmlLang(locale)
-
   return (
-    <html lang={htmlLang} suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning>
       <body suppressHydrationWarning className={`${_inter.variable} ${_spaceMono.variable} font-sans antialiased`}>
         {children}
         <Toaster theme="dark" position="top-right" richColors closeButton />
