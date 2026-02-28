@@ -5,9 +5,16 @@ import { useRouter, usePathname } from "next/navigation"
 import { ChevronDown, Globe } from "lucide-react"
 
 const languages = [
-  { code: "en", label: "English" },
   { code: "pt", label: "Portugu\u00eas" },
+  { code: "en", label: "English" },
   { code: "ru", label: "\u0420\u0443\u0441\u0441\u043a\u0438\u0439" },
+  { code: "es", label: "Espa\u00f1ol" },
+  { code: "ja", label: "\u65e5\u672c\u8a9e" },
+  { code: "zh", label: "\u4e2d\u6587" },
+  { code: "de", label: "Deutsch" },
+  { code: "fr", label: "Fran\u00e7ais" },
+  { code: "tr", label: "T\u00fcrk\u00e7e" },
+  { code: "ko", label: "\ud55c\uad6d\uc5b4" },
 ]
 
 interface SiteHeaderProps {
@@ -23,7 +30,7 @@ export function SiteHeader({ lang }: SiteHeaderProps) {
 
   const switchLocale = (code: string) => {
     // Replace the current locale segment in the path
-    const newPath = pathname.replace(/^\/(en|pt|ru)/, `/${code}`)
+    const newPath = pathname.replace(/^\/(en|pt|ru|es|ja|zh|de|fr|tr|ko)/, `/${code}`)
     router.push(newPath)
     setOpen(false)
   }
@@ -46,7 +53,7 @@ export function SiteHeader({ lang }: SiteHeaderProps) {
         </button>
 
         {open && (
-          <div className="absolute right-0 top-full z-50 mt-1 w-40 overflow-hidden rounded-lg border border-border bg-card shadow-xl">
+          <div className="absolute right-0 top-full z-50 mt-1 max-h-60 w-40 overflow-y-auto rounded-lg border border-border bg-card shadow-xl">
             {languages.map((l) => (
               <button
                 key={l.code}

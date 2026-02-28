@@ -1,0 +1,64 @@
+{
+  "header": {
+    "brand": "SuKo Shop",
+    "selectLanguage": "Choisir la langue"
+  },
+  "hero": {
+    "title": "E-mail temporaire SuKo",
+    "subtitle": "Recevez des e-mails instantanément sur vos domaines."
+  },
+  "emailInput": {
+    "heading": "Accédez à votre boîte de réception",
+    "description": "Entrez votre adresse e-mail complète pour vérifier votre boîte de réception",
+    "placeholder": "Entrez votre e-mail (ex: kratos@sub.sukospot.shop)",
+    "ariaLabel": "Adresse e-mail complète",
+    "copyAriaLabel": "Copier l'e-mail",
+    "accessAriaLabel": "Accéder à l'e-mail",
+    "loading": "Chargement...",
+    "submit": "Accéder à l'e-mail",
+    "copiedToast": "E-mail copié dans le presse-papiers !",
+    "copyErrorToast": "Impossible de copier."
+  },
+  "inbox": {
+    "title": "Boîte de réception",
+    "checking": "Vérification...",
+    "updatesIn": "Mise à jour dans",
+    "seconds": "s",
+    "refreshAriaLabel": "Actualiser la boîte de réception",
+    "refreshing": "Actualisation...",
+    "refresh": "Actualiser",
+    "warning": "Les e-mails peuvent prendre de 15 à 30 secondes pour arriver en raison du traitement du serveur. Si vous ne les voyez pas, attendez un moment et cliquez sur Actualiser.",
+    "searching": "Recherche d'e-mails...",
+    "attachment": "pièce jointe",
+    "attachments": "pièces jointes",
+    "noEmailsFound": "Aucun e-mail trouvé",
+    "noEmailSelected": "Aucun e-mail sélectionné",
+    "emptyInbox": "Votre boîte de réception est vide. Les nouveaux messages apparaîtront ici automatiquement.",
+    "enterEmailPrompt": "Entrez un e-mail ci-dessus et cliquez sur 'Accéder à l'e-mail' pour vérifier votre boîte de réception."
+  },
+  "notifications": {
+    "newEmailBrowser": "Nouvel e-mail reçu !",
+    "from": "De",
+    "newEmailToastOne": "1 nouvel e-mail !",
+    "newEmailToastMany": "{count} nouveaux e-mails !"
+  },
+  "errors": {
+    "invalidFormat": "Format d'e-mail invalide. Utilisez utilisateur@domaine.sukospot.shop",
+    "noUsername": "Entrez un nom d'utilisateur avant le @",
+    "unsupportedDomain": "Domaine non supporté. Utilisez des sous-domaines de :",
+    "fetchError": "Erreur lors de la récupération des e-mails. Veuillez réessayer.",
+    "genericError": "Erreur lors de la récupération des e-mails.",
+    "updateError": "Erreur lors de l'actualisation."
+  },
+  "status": {
+    "inboxUpdated": "Boîte de réception mise à jour",
+    "checkingNewEmails": "Recherche de nouveaux e-mails..."
+  },
+  "footer": {
+    "text": "SuKo Shop \u00b7 Service d'e-mail temporaire \u00b7 Tous les messages sont automatiquement supprimés après 24 heures"
+  },
+  "metadata": {
+    "title": "SuKo Shop - E-mail temporaire",
+    "description": "Accédez à votre boîte de réception temporaire sur les domaines SuKo"
+  }
+}
