@@ -6,13 +6,13 @@ import { AlertTriangle, ExternalLink, X } from "lucide-react"
 import { SiteHeader } from "@/components/site-header"
 import { EmailInput, ROOT_DOMAINS, isSupportedDomain } from "@/components/email-input"
 import { Inbox, type Email } from "@/components/mail-inbox"
-import type { Dictionary } from "@/lib/i18n"
+
 
 const POLL_SECONDS = 10
 const NEW_URL = "https://tempmailsuko.shop/"
 
 // Hardcoded Portuguese dictionary for standalone page
-const dict: Dictionary = {
+const dict = {
   header: {
     brand: "SuKo Shop",
     selectLanguage: "Selecionar idioma",
