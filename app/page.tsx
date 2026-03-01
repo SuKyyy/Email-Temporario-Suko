@@ -6,12 +6,17 @@ import { AlertTriangle, ExternalLink, X } from "lucide-react"
 import { SiteHeader } from "@/components/site-header"
 import { EmailInput, ROOT_DOMAINS, isSupportedDomain } from "@/components/email-input"
 import { Inbox, type Email } from "@/components/mail-inbox"
+import type { Dictionary } from "@/lib/i18n"
 
 const POLL_SECONDS = 10
 const NEW_URL = "https://tempmailsuko.shop/"
 
 // Hardcoded Portuguese dictionary for standalone page
-const dict = {
+const dict: Dictionary = {
+  header: {
+    brand: "SuKo Shop",
+    selectLanguage: "Selecionar idioma",
+  },
   hero: {
     title: "Email Temporário SuKo",
     subtitle: "Receba emails instantaneamente nos seus domínios.",
@@ -65,6 +70,10 @@ const dict = {
   },
   footer: {
     text: "SuKo Shop · Serviço de email temporário · Todas as mensagens são excluídas automaticamente após 24 horas",
+  },
+  metadata: {
+    title: "SuKo Shop - Email Temporário",
+    description: "Acesse sua caixa de entrada temporária nos domínios SuKo",
   },
 }
 
