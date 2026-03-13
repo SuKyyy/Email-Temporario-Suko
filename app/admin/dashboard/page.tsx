@@ -22,13 +22,11 @@ function generateCode(): string {
 }
 
 export default function AdminDashboardPage() {
-  const [codes, setCodes] = useState<AccessCode[]>([
-    { id: "1", code: "SUKO7X9A", status: "active", createdAt: "2024-01-15" },
-    { id: "2", code: "TEMP3K2B", status: "used", createdAt: "2024-01-14" },
-    { id: "3", code: "ACC9M5NP", status: "active", createdAt: "2024-01-13" },
-    { id: "4", code: "LINK2W8C", status: "expired", createdAt: "2024-01-10" },
-  ])
+  const [codes, setCodes] = useState<AccessCode[]>([])
+  const [quantity, setQuantity] = useState(8)
+  const [lastBatch, setLastBatch] = useState<string[]>([])
   const [copiedId, setCopiedId] = useState<string | null>(null)
+  const [copiedAll, setCopiedAll] = useState(false)
   const router = useRouter()
 
   useEffect(() => {
@@ -38,15 +36,40 @@ export default function AdminDashboardPage() {
     }
   }, [router])
 
-  const handleGenerateCode = () => {
-    const newCode: AccessCode = {
-      id: crypto.randomUUID(),
-      code: generateCode(),
-      status: "active",
-      createdAt: new Date().toISOString().split("T")[0],
+  const handleGenerateCodes = () => {
+    const today = new Date().toISOString().split("T")[0]
+    const newCodes: AccessCode[] = []
+    const newBatch: string[] = []
+    
+    for (let i = 0; i < quantity; i++) {
+      const code = `SUKO-${generateCode()}`
+      newCodes.push({
+        id: crypto.randomUUID(),
+        code,
+        status: "active",
+        createdAt: today,
+      })
+      newBatch.push(code)
     }
-    setCodes([newCode, ...codes])
-    toast.success("Novo codigo gerado!")
+    
+    setCodes([...newCodes, ...codes])
+    setLastBatch(newBatch)
+    toast.success(`${quantity} codigo(s) gerado(s)!`)
+  }
+
+  const handleCopyAll = async () => {
+    if (lastBatch.length === 0) {
+      toast.error("Nenhum codigo para copiar")
+      return
+    }
+    try {
+      await navigator.clipboard.writeText(lastBatch.join("\n"))
+      setCopiedAll(true)
+      toast.success("Todos os codigos copiados!")
+      setTimeout(() => setCopiedAll(false), 2000)
+    } catch {
+      toast.error("Erro ao copiar")
+    }
   }
 
   const handleCopy = async (code: string, id: string) => {
@@ -118,21 +141,63 @@ export default function AdminDashboardPage() {
           </div>
 
           <div className="rounded-xl border border-neutral-800 bg-[#1e1e1e] p-6 shadow-lg">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <h2 className="text-lg font-bold text-white">Gerar Codigo de Acesso</h2>
+                <h2 className="text-lg font-bold text-white">Gerar Codigos de Acesso</h2>
                 <p className="text-sm text-neutral-400">
-                  Crie um novo codigo para fornecer aos usuarios.
+                  Crie novos codigos para fornecer aos usuarios.
                 </p>
               </div>
-              <button
-                onClick={handleGenerateCode}
-                className="flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition-all hover:bg-emerald-700"
-              >
-                <Plus className="h-4 w-4" />
-                Gerar Novo Codigo
-              </button>
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2">
+                  <label htmlFor="quantity" className="text-sm text-neutral-400">
+                    Quantidade:
+                  </label>
+                  <input
+                    id="quantity"
+                    type="number"
+                    min={1}
+                    max={50}
+                    value={quantity}
+                    onChange={(e) => setQuantity(Math.max(1, Math.min(50, parseInt(e.target.value) || 1)))}
+                    className="w-16 rounded-lg border border-neutral-800 bg-neutral-950 px-3 py-2 text-sm text-white text-center focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                  />
+                </div>
+                <button
+                  onClick={handleGenerateCodes}
+                  className="flex items-center gap-2 rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white transition-all hover:bg-emerald-700"
+                >
+                  <Plus className="h-4 w-4" />
+                  Gerar Novo Codigo
+                </button>
+              </div>
             </div>
+
+            {lastBatch.length > 0 && (
+              <div className="mt-4 pt-4 border-t border-neutral-800">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm text-neutral-400">
+                    Ultimo lote: {lastBatch.length} codigo(s)
+                  </span>
+                  <button
+                    onClick={handleCopyAll}
+                    className="flex items-center gap-2 rounded-lg border border-neutral-700 bg-neutral-800 px-3 py-1.5 text-xs font-medium text-white transition-all hover:bg-neutral-700"
+                  >
+                    {copiedAll ? (
+                      <>
+                        <Check className="h-3.5 w-3.5 text-emerald-500" />
+                        Copiado!
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="h-3.5 w-3.5" />
+                        Copiar Todos
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="rounded-xl border border-neutral-800 bg-[#1e1e1e] p-6 shadow-lg">
