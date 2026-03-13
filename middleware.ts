@@ -54,6 +54,6 @@ export const config = {
      * - /favicon.ico, /robots.txt, /sitemap.xml
      * - Static file extensions (.png, .jpg, .svg, .css, .js, etc.)
      */
-    "/((?!api|_next/static|_next/image|favicon\\.ico|robots\\.txt|sitemap\\.xml|.*\\..*).*)",
+    "/((?!api|admin|_next/static|_next/image|favicon\\.ico|robots\\.txt|sitemap\\.xml|.*\\..*).*)",
   ],
 }

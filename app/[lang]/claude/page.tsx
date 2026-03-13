@@ -26,6 +26,7 @@ export default function ClaudeAccessPage({
 }) {
   const [langOpen, setLangOpen] = useState(false)
   const [email, setEmail] = useState("")
+  const [accessCode, setAccessCode] = useState("")
   const [generatedLink, setGeneratedLink] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [copied, setCopied] = useState(false)
@@ -44,7 +45,11 @@ export default function ClaudeAccessPage({
 
   const handleGenerateLink = async () => {
     if (!email.trim()) {
-      toast.error("Digite um email válido")
+      toast.error("Digite um email valido")
+      return
+    }
+    if (!accessCode.trim()) {
+      toast.error("Digite o codigo de acesso")
       return
     }
 
@@ -157,23 +162,40 @@ export default function ClaudeAccessPage({
               Digite o email da conta para receber o link temporario.
             </p>
 
-            <div className="flex flex-col gap-3 sm:flex-row">
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && email.trim()) handleGenerateLink()
-                }}
-                placeholder="usuario@sukisukic1.shop"
-                className="w-full rounded-lg border border-neutral-800 bg-neutral-950 px-4 py-3 text-sm text-white placeholder:text-neutral-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50"
-                aria-label="Email da conta"
-              />
+            <div className="space-y-4">
+              <div>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="usuario@sukisukic1.shop"
+                  className="w-full rounded-lg border border-neutral-800 bg-neutral-950 px-4 py-3 text-sm text-white placeholder:text-neutral-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                  aria-label="Email da conta"
+                />
+              </div>
+
+              <div>
+                <input
+                  type="text"
+                  value={accessCode}
+                  onChange={(e) => setAccessCode(e.target.value.toUpperCase())}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && email.trim() && accessCode.trim()) handleGenerateLink()
+                  }}
+                  placeholder="Codigo de Acesso"
+                  className="w-full rounded-lg border border-neutral-800 bg-neutral-950 px-4 py-3 text-sm text-white placeholder:text-neutral-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 font-mono tracking-wider"
+                  aria-label="Codigo de Acesso"
+                  maxLength={8}
+                />
+                <p className="mt-1.5 text-xs text-neutral-500">
+                  Insira o codigo fornecido pelo administrador.
+                </p>
+              </div>
 
               <button
                 onClick={handleGenerateLink}
-                disabled={!email.trim() || loading}
-                className="flex shrink-0 items-center justify-center gap-2 rounded-lg bg-emerald-600 px-6 py-3 text-sm font-semibold text-white transition-all hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+                disabled={!email.trim() || !accessCode.trim() || loading}
+                className="flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-600 px-6 py-3 text-sm font-semibold text-white transition-all hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {loading ? (
                   <>
