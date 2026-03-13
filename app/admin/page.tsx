@@ -5,29 +5,40 @@ import { useRouter } from "next/navigation"
 import { Loader2, Lock } from "lucide-react"
 import { toast } from "sonner"
 
+const VALID_USERNAME = "sukoadminpika"
+const VALID_PASSWORD = "TOnyEnzO123!?"
+
 export default function AdminLoginPage() {
+  const [username, setUsername] = useState("")
   const [password, setPassword] = useState("")
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const router = useRouter()
 
   const handleLogin = async () => {
+    setError(null)
+
+    if (!username.trim()) {
+      setError("Digite o nome de usuario")
+      return
+    }
     if (!password.trim()) {
-      toast.error("Digite a senha")
+      setError("Digite a senha")
       return
     }
 
     setLoading(true)
     
-    // Simulate authentication - in production, verify against your backend
+    // Simulate authentication delay
     await new Promise((resolve) => setTimeout(resolve, 1000))
     
-    // Mock password check (replace with real auth)
-    if (password === "suko2024") {
+    // Mock credential validation
+    if (username === VALID_USERNAME && password === VALID_PASSWORD) {
       localStorage.setItem("admin_auth", "true")
       toast.success("Login realizado com sucesso!")
       router.push("/admin/dashboard")
     } else {
-      toast.error("Senha incorreta")
+      setError("Usuario ou senha incorretos")
     }
     
     setLoading(false)
@@ -58,6 +69,29 @@ export default function AdminLoginPage() {
             </div>
 
             <div className="space-y-4">
+              {error && (
+                <div className="rounded-lg bg-red-500/10 border border-red-500/30 px-4 py-3 text-sm text-red-400">
+                  {error}
+                </div>
+              )}
+
+              <div>
+                <label htmlFor="username" className="block text-sm font-medium text-neutral-300 mb-2">
+                  Usuario
+                </label>
+                <input
+                  id="username"
+                  type="text"
+                  value={username}
+                  onChange={(e) => {
+                    setUsername(e.target.value)
+                    setError(null)
+                  }}
+                  placeholder="Digite o nome de usuario"
+                  className="w-full rounded-lg border border-neutral-800 bg-neutral-950 px-4 py-3 text-sm text-white placeholder:text-neutral-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                />
+              </div>
+
               <div>
                 <label htmlFor="password" className="block text-sm font-medium text-neutral-300 mb-2">
                   Senha
@@ -66,18 +100,21 @@ export default function AdminLoginPage() {
                   id="password"
                   type="password"
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && password.trim()) handleLogin()
+                  onChange={(e) => {
+                    setPassword(e.target.value)
+                    setError(null)
                   }}
-                  placeholder="Digite a senha de administrador"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && username.trim() && password.trim()) handleLogin()
+                  }}
+                  placeholder="Digite a senha"
                   className="w-full rounded-lg border border-neutral-800 bg-neutral-950 px-4 py-3 text-sm text-white placeholder:text-neutral-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50"
                 />
               </div>
 
               <button
                 onClick={handleLogin}
-                disabled={!password.trim() || loading}
+                disabled={!username.trim() || !password.trim() || loading}
                 className="flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-600 px-6 py-3 text-sm font-semibold text-white transition-all hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {loading ? (

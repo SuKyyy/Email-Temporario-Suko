@@ -45,6 +45,12 @@ export function SiteHeader({ lang }: SiteHeaderProps) {
           >
             Acesso Claude
           </a>
+          <a
+            href="/admin"
+            className="text-xs font-medium text-white/60 transition-colors hover:text-white"
+          >
+            Admin
+          </a>
         </nav>
       </div>
 
