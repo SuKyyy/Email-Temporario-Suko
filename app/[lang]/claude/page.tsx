@@ -91,9 +91,9 @@ export default function ClaudeAccessPage({
       storedCodes[codeIndex].status = "used"
       localStorage.setItem("suko_codes", JSON.stringify(storedCodes))
       
-      // Generate a mock token
+      // Generate a mock token with email included
       const token = crypto.randomUUID()
-      const link = `https://tempmailsuko.shop/access?token=${token}`
+      const link = `/access?token=${token}&email=${encodeURIComponent(email.trim())}`
       
       setGeneratedLink(link)
       setLoading(false)
