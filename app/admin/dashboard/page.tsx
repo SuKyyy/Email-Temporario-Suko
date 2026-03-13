@@ -33,6 +33,17 @@ export default function AdminDashboardPage() {
     const auth = localStorage.getItem("admin_auth")
     if (!auth) {
       router.push("/admin")
+      return
+    }
+    
+    // Load existing codes from localStorage
+    const storedCodes = localStorage.getItem("suko_codes")
+    if (storedCodes) {
+      try {
+        setCodes(JSON.parse(storedCodes))
+      } catch {
+        // Invalid JSON, start fresh
+      }
     }
   }, [router])
 
@@ -52,8 +63,13 @@ export default function AdminDashboardPage() {
       newBatch.push(code)
     }
     
-    setCodes([...newCodes, ...codes])
+    const updatedCodes = [...newCodes, ...codes]
+    setCodes(updatedCodes)
     setLastBatch(newBatch)
+    
+    // Save to localStorage for validation on Claude page
+    localStorage.setItem("suko_codes", JSON.stringify(updatedCodes))
+    
     toast.success(`${quantity} codigo(s) gerado(s)!`)
   }
 

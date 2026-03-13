@@ -30,6 +30,7 @@ export default function ClaudeAccessPage({
   const [generatedLink, setGeneratedLink] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [copied, setCopied] = useState(false)
+  const [codeError, setCodeError] = useState<string | null>(null)
   const router = useRouter()
   const pathname = usePathname()
 
@@ -44,6 +45,8 @@ export default function ClaudeAccessPage({
   }
 
   const handleGenerateLink = async () => {
+    setCodeError(null)
+    
     if (!email.trim()) {
       toast.error("Digite um email valido")
       return
@@ -55,16 +58,50 @@ export default function ClaudeAccessPage({
 
     setLoading(true)
     
-    // Simulate API call - in production, this would call your backend
-    await new Promise((resolve) => setTimeout(resolve, 1500))
+    // Simulate API call delay
+    await new Promise((resolve) => setTimeout(resolve, 1000))
     
-    // Generate a mock token
-    const token = crypto.randomUUID()
-    const link = `https://tempmailsuko.shop/access?token=${token}`
-    
-    setGeneratedLink(link)
-    setLoading(false)
-    toast.success("Link gerado com sucesso!")
+    // Check code in localStorage
+    const storedCodesRaw = localStorage.getItem("suko_codes")
+    if (!storedCodesRaw) {
+      setCodeError("Codigo invalido ou ja utilizado")
+      setLoading(false)
+      return
+    }
+
+    try {
+      const storedCodes = JSON.parse(storedCodesRaw) as Array<{
+        id: string
+        code: string
+        status: "active" | "used" | "expired"
+        createdAt: string
+      }>
+      
+      const codeIndex = storedCodes.findIndex(
+        (c) => c.code === accessCode.trim() && c.status === "active"
+      )
+      
+      if (codeIndex === -1) {
+        setCodeError("Codigo invalido ou ja utilizado")
+        setLoading(false)
+        return
+      }
+      
+      // Mark code as used
+      storedCodes[codeIndex].status = "used"
+      localStorage.setItem("suko_codes", JSON.stringify(storedCodes))
+      
+      // Generate a mock token
+      const token = crypto.randomUUID()
+      const link = `https://tempmailsuko.shop/access?token=${token}`
+      
+      setGeneratedLink(link)
+      setLoading(false)
+      toast.success("Link gerado com sucesso!")
+    } catch {
+      setCodeError("Erro ao validar codigo")
+      setLoading(false)
+    }
   }
 
   const handleCopy = async () => {
@@ -163,6 +200,12 @@ export default function ClaudeAccessPage({
             </p>
 
             <div className="space-y-4">
+              {codeError && (
+                <div className="rounded-lg bg-red-500/10 border border-red-500/30 px-4 py-3 text-sm text-red-400">
+                  {codeError}
+                </div>
+              )}
+
               <div>
                 <input
                   type="email"
@@ -182,10 +225,9 @@ export default function ClaudeAccessPage({
                   onKeyDown={(e) => {
                     if (e.key === "Enter" && email.trim() && accessCode.trim()) handleGenerateLink()
                   }}
-                  placeholder="Codigo de Acesso"
+                  placeholder="Codigo de Acesso (ex: SUKO-A1B2C3D4)"
                   className="w-full rounded-lg border border-neutral-800 bg-neutral-950 px-4 py-3 text-sm text-white placeholder:text-neutral-500 focus:outline-none focus:ring-2 focus:ring-purple-500/50 font-mono tracking-wider"
                   aria-label="Codigo de Acesso"
-                  maxLength={8}
                 />
                 <p className="mt-1.5 text-xs text-neutral-500">
                   Insira o codigo fornecido pelo administrador.
