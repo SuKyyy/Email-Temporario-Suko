@@ -30,8 +30,22 @@ export function SiteHeader({ lang }: SiteHeaderProps) {
 
   return (
     <header className="flex items-center justify-between px-6 py-3" style={{ backgroundColor: "#6b46c1" }}>
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-6">
         <span className="text-xl font-bold tracking-tight text-white">SuKo Shop</span>
+        <nav className="flex items-center gap-4">
+          <a
+            href={`/${lang}`}
+            className="text-sm font-medium text-white/80 transition-colors hover:text-white"
+          >
+            Inbox
+          </a>
+          <a
+            href={`/claude/${lang}`}
+            className="text-sm font-medium text-white/80 transition-colors hover:text-white"
+          >
+            Acesso Claude
+          </a>
+        </nav>
       </div>
 
       <div className="flex items-center gap-2">
