@@ -40,7 +40,7 @@ export function SiteHeader({ lang }: SiteHeaderProps) {
             Inbox
           </a>
           <a
-            href={`/claude/${lang}`}
+            href={`/${lang}/claude`}
             className="text-sm font-medium text-white/80 transition-colors hover:text-white"
           >
             Acesso Claude

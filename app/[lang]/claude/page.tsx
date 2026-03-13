@@ -32,12 +32,12 @@ export default function ClaudeAccessPage({
   const router = useRouter()
   const pathname = usePathname()
 
-  // Extract lang from pathname since params is a Promise in App Router
-  const currentLang = pathname.split("/")[2] || "pt"
+  // Extract lang from pathname - now the route is /[lang]/claude
+  const currentLang = pathname.split("/")[1] || "pt"
   const selected = languages.find((l) => l.code === currentLang) ?? languages[1]
 
   const switchLocale = (code: string) => {
-    const newPath = pathname.replace(/\/claude\/(en|pt|ru)/, `/claude/${code}`)
+    const newPath = pathname.replace(/^\/(en|pt|ru)\//, `/${code}/`)
     router.push(newPath)
     setLangOpen(false)
   }
@@ -77,9 +77,23 @@ export default function ClaudeAccessPage({
   return (
     <div className="flex min-h-screen flex-col bg-[#121212]">
       {/* Navbar */}
-      <header className="flex items-center justify-between px-6 py-3 bg-purple-600">
-        <div className="flex items-center gap-2">
+      <header className="flex items-center justify-between px-6 py-3" style={{ backgroundColor: "#6b46c1" }}>
+        <div className="flex items-center gap-6">
           <span className="text-xl font-bold tracking-tight text-white">SuKo Shop</span>
+          <nav className="flex items-center gap-4">
+            <a
+              href={`/${currentLang}`}
+              className="text-sm font-medium text-white/80 transition-colors hover:text-white"
+            >
+              Inbox
+            </a>
+            <a
+              href={`/${currentLang}/claude`}
+              className="text-sm font-medium text-white/80 transition-colors hover:text-white"
+            >
+              Acesso Claude
+            </a>
+          </nav>
         </div>
 
         <div className="flex items-center gap-2">
