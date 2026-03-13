@@ -7,6 +7,7 @@ const ROOT_DOMAINS = [
   "sukodocursor.shop",
   "sukoultra.shop",
   "sukov0dev.shop",
+  "sukisukic1.shop",
 ] as const
 
 function isSupportedDomain(domain: string): boolean {
@@ -88,6 +89,11 @@ export async function GET(request: NextRequest) {
     imapUser = process.env.IMAP_USER_V0 || ""
     imapPass = process.env.IMAP_PASS_V0 || ""
     useLocalFilter = false
+  } else if (bareDomain === "sukisukic1.shop" || bareDomain.endsWith(".sukisukic1.shop")) {
+    // sukisukic1.shop routes to ademinsukocursor@sukodocursor.shop (uses CURSOR credentials)
+    imapUser = process.env.IMAP_USER_CURSOR || ""
+    imapPass = process.env.IMAP_PASS_CURSOR || ""
+    useLocalFilter = true // Filter locally since emails are forwarded
   } else {
     return NextResponse.json({ error: "Dominio sem credenciais configuradas." }, { status: 400 })
   }

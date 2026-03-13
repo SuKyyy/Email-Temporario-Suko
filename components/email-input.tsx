@@ -12,6 +12,7 @@ export const ROOT_DOMAINS = [
   "sukodocursor.shop",
   "sukoultra.shop",
   "sukov0dev.shop",
+  "sukisukic1.shop",
 ] as const
 
 export function isSupportedDomain(domain: string): boolean {
