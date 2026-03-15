@@ -5,24 +5,6 @@ import { Check, Copy, Loader2 } from "lucide-react"
 import { toast } from "sonner"
 import type { Dictionary } from "@/lib/i18n"
 
-// Root domains — any subdomain of these is also valid
-// e.g. @sub.sukospot.shop, @anything.sukoultra.shop
-export const ROOT_DOMAINS = [
-  "sukospot.shop",
-  "sukodocursor.shop",
-  "sukoultra.shop",
-  "sukov0dev.shop",
-  "sukisukic1.shop",
-] as const
-
-export function isSupportedDomain(domain: string): boolean {
-  // domain comes in as "@something.sukospot.shop" or "@sukospot.shop"
-  const bare = domain.startsWith("@") ? domain.slice(1) : domain
-  return ROOT_DOMAINS.some(
-    (root) => bare === root || bare.endsWith(`.${root}`)
-  )
-}
-
 interface EmailInputProps {
   email: string
   error: string | null

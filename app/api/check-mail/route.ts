@@ -2,21 +2,6 @@ import { NextRequest, NextResponse } from "next/server"
 import imapSimple from "imap-simple"
 import { simpleParser } from "mailparser"
 
-const ROOT_DOMAINS = [
-  "sukospot.shop",
-  "sukodocursor.shop",
-  "sukoultra.shop",
-  "sukov0dev.shop",
-  "sukisukic1.shop",
-] as const
-
-function isSupportedDomain(domain: string): boolean {
-  const bare = domain.startsWith("@") ? domain.slice(1) : domain
-  return ROOT_DOMAINS.some(
-    (root) => bare === root || bare.endsWith(`.${root}`)
-  )
-}
-
 function formatRelativeTime(date: Date): string {
   const now = Date.now()
   const diffMs = now - date.getTime()
@@ -46,13 +31,6 @@ export async function GET(request: NextRequest) {
 
   // Normalize domain: ensure it starts with "@"
   const normalizedDomain = rawDomain.startsWith("@") ? rawDomain : `@${rawDomain}`
-
-  if (!isSupportedDomain(normalizedDomain)) {
-    return NextResponse.json(
-      { error: `Dominio nao suportado: ${normalizedDomain}. Use subdominios de: ${ROOT_DOMAINS.map((d) => `@${d}`).join(", ")}` },
-      { status: 400 }
-    )
-  }
 
   // Determine which IMAP account to connect to based on domain:
   // - sukospot.shop subdomains: Cloudflare Email Routing -> central inbox (IMAP_CENTRAL_USER)
@@ -95,7 +73,11 @@ export async function GET(request: NextRequest) {
     imapPass = process.env.IMAP_PASS_CURSOR || ""
     useLocalFilter = true // Filter locally since emails are forwarded
   } else {
-    return NextResponse.json({ error: "Dominio sem credenciais configuradas." }, { status: 400 })
+    // Default: use ULTRA credentials with local filtering for any other domain
+    // This allows any subdomain to be queried as long as email routing is configured
+    imapUser = process.env.IMAP_USER_ULTRA || ""
+    imapPass = process.env.IMAP_PASS_ULTRA || ""
+    useLocalFilter = true
   }
 
   const imapHost = process.env.IMAP_HOST || "imap.titan.email"
