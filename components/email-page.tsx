@@ -127,6 +127,16 @@ export function EmailPage({ dict, lang }: EmailPageProps) {
     }
   }
 
+  // Deduplicate emails by id
+  const dedupeEmails = useCallback((emailList: Email[]): Email[] => {
+    const seen = new Set<string>()
+    return emailList.filter((e) => {
+      if (seen.has(e.id)) return false
+      seen.add(e.id)
+      return true
+    })
+  }, [])
+
   const fetchEmails = useCallback(async (user: string, domain: string) => {
     const res = await fetch(
       `/api/check-mail?user=${encodeURIComponent(user)}&domain=${encodeURIComponent(domain)}`
@@ -135,8 +145,9 @@ export function EmailPage({ dict, lang }: EmailPageProps) {
     if (!res.ok) {
       throw new Error(data.error || dict.errors.fetchError)
     }
-    return data.emails as Email[]
-  }, [dict.errors.fetchError])
+    // Deduplicate emails before returning
+    return dedupeEmails(data.emails as Email[])
+  }, [dict.errors.fetchError, dedupeEmails])
 
   // Check for new emails and notify
   const checkForNewEmails = useCallback((prev: Email[], next: Email[]) => {
