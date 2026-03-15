@@ -313,8 +313,8 @@ export function Inbox({
         <EmptyState hasSearched={hasSearched} dict={dict} />
       ) : (
         <div className="divide-y divide-border">
-          {emails.map((email) => (
-            <EmailItem key={email.id} email={email} dict={dict} />
+          {emails.map((email, index) => (
+            <EmailItem key={`${email.id}-${index}`} email={email} dict={dict} />
           ))}
         </div>
       )}
