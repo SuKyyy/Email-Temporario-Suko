@@ -4,7 +4,7 @@ import { useState, useCallback, useEffect, useRef } from "react"
 import { toast } from "sonner"
 import { AlertTriangle, ExternalLink, X } from "lucide-react"
 import { SiteHeader } from "@/components/site-header"
-import { EmailInput, ROOT_DOMAINS, isSupportedDomain } from "@/components/email-input"
+import { EmailInput } from "@/components/email-input"
 import { Inbox, type Email } from "@/components/mail-inbox"
 import type { Dictionary } from "@/lib/i18n"
 
@@ -213,13 +213,6 @@ export function EmailPage({ dict, lang }: EmailPageProps) {
 
     if (!user) {
       setError(dict.errors.noUsername)
-      return
-    }
-
-    if (!isSupportedDomain(domain)) {
-      setError(
-        `${dict.errors.unsupportedDomain} ${ROOT_DOMAINS.map((d) => `@${d}`).join(", ")}`
-      )
       return
     }
 
