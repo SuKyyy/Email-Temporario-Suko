@@ -30,6 +30,7 @@ export interface Email {
   date: string
   body: string
   attachments?: Attachment[]
+  account?: string // "cursor" or "ultra" - identifies which mailbox the email came from
 }
 
 interface InboxProps {
