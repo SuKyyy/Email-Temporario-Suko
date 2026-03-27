@@ -172,6 +172,7 @@ export async function GET(request: NextRequest) {
   // Account 1: ademinsukocursor@sukodocursor.shop
   const cursorUser = process.env.IMAP_USER_CURSOR || "ademinsukocursor@sukodocursor.shop"
   const cursorPass = process.env.IMAP_PASS_CURSOR || ""
+  console.log("[v0] CURSOR config - user:", cursorUser, "pass length:", cursorPass.length, "pass preview:", cursorPass.substring(0, 3) + "***")
   if (cursorPass) {
     accounts.push({ name: "cursor", user: cursorUser, pass: cursorPass })
   }
@@ -179,6 +180,7 @@ export async function GET(request: NextRequest) {
   // Account 2: sukoademirultra@sukoultra.shop (may be blocked, but try anyway)
   const ultraUser = process.env.IMAP_USER_ULTRA || "sukoademirultra@sukoultra.shop"
   const ultraPass = process.env.IMAP_PASS_ULTRA || ""
+  console.log("[v0] ULTRA config - user:", ultraUser, "pass length:", ultraPass.length)
   if (ultraPass) {
     accounts.push({ name: "ultra", user: ultraUser, pass: ultraPass })
   }
