@@ -53,7 +53,8 @@ async function fetchEmailsFromAccount(
         host: imapHost,
         port: imapPort,
         tls: true,
-        authTimeout: 15000,
+        authTimeout: 8000,
+        connTimeout: 8000,
         tlsOptions: { rejectUnauthorized: false },
       },
     }
@@ -61,14 +62,19 @@ async function fetchEmailsFromAccount(
     connection = await imapSimple.connect(config)
     await connection.openBox("INBOX")
 
+    // Fetch only recent emails (last 7 days) to speed up search
+    const sevenDaysAgo = new Date()
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
+    const searchCriteria = [["SINCE", sevenDaysAgo]]
+
     const fetchOptions = {
       bodies: ["HEADER", ""],
       markSeen: false,
-      struct: true,
     }
 
-    const allMessages = await connection.search(["ALL"], fetchOptions)
-    const recentBatch = allMessages.slice(-30).reverse()
+    const allMessages = await connection.search(searchCriteria, fetchOptions)
+    // Get only last 20 messages for faster processing
+    const recentBatch = allMessages.slice(-20).reverse()
 
     const targetLower = targetAddress.toLowerCase()
 
@@ -79,21 +85,25 @@ async function fetchEmailsFromAccount(
         const headerPart = message.parts.find((part: { which: string }) => part.which === "HEADER")
         const rawEmail = allBody?.body || ""
 
-        // Check all possible headers for the target address
-        const toHeader = (headerPart?.body?.to || []).join(" ").toLowerCase()
-        const xOrigTo = (headerPart?.body?.["x-original-to"] || []).join(" ").toLowerCase()
-        const deliveredTo = (headerPart?.body?.["delivered-to"] || []).join(" ").toLowerCase()
-        const ccHeader = (headerPart?.body?.cc || []).join(" ").toLowerCase()
-        const xForwardedTo = (headerPart?.body?.["x-forwarded-to"] || []).join(" ").toLowerCase()
-        const rawLower = typeof rawEmail === "string" ? rawEmail.substring(0, 3000).toLowerCase() : ""
-
-        const matchesTarget =
-          toHeader.includes(targetLower) ||
-          xOrigTo.includes(targetLower) ||
-          deliveredTo.includes(targetLower) ||
-          ccHeader.includes(targetLower) ||
-          xForwardedTo.includes(targetLower) ||
-          rawLower.includes(targetLower)
+        // Check headers for target address (optimized - check most common first)
+        const headers = headerPart?.body || {}
+        const toHeader = (headers.to || []).join(" ").toLowerCase()
+        
+        // Quick check on TO header first (most common case)
+        let matchesTarget = toHeader.includes(targetLower)
+        
+        // Only check other headers if TO didn't match
+        if (!matchesTarget) {
+          const xOrigTo = (headers["x-original-to"] || []).join(" ").toLowerCase()
+          const deliveredTo = (headers["delivered-to"] || []).join(" ").toLowerCase()
+          matchesTarget = xOrigTo.includes(targetLower) || deliveredTo.includes(targetLower)
+        }
+        
+        // Last resort: check raw email (limited scan)
+        if (!matchesTarget) {
+          const rawLower = typeof rawEmail === "string" ? rawEmail.substring(0, 2000).toLowerCase() : ""
+          matchesTarget = rawLower.includes(targetLower)
+        }
 
         if (!matchesTarget) continue
 
@@ -212,8 +222,8 @@ export async function GET(request: NextRequest) {
       return true
     })
 
-    // Take top 15 and remove internal fields
-    const emails = uniqueEmails.slice(0, 15).map(({ uid, parsedDate, ...email }) => email)
+    // Take top 10 and remove internal fields
+    const emails = uniqueEmails.slice(0, 10).map(({ uid, parsedDate, ...email }) => email)
 
     return NextResponse.json(
       { emails, user, domain: normalizedDomain },
