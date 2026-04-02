@@ -5,7 +5,10 @@
   },
   "hero": {
     "title": "Email Temporario SuKo",
-    "subtitle": "Receba emails instantaneamente nos seus dominios."
+    "subtitle": "Receba emails instantaneamente nos seus dominios.",
+    "tutorialTitle": "Como usar",
+    "tutorialStep1": "Digite o email do produto que voce comprou para receber codigos de verificacao ou fazer alteracoes na conta.",
+    "tutorialStep2": "Voce pode remover o email da sua conta se quiser, mas isso causara a perda da garantia do produto."
   },
   "emailInput": {
     "heading": "Acesse sua Caixa de Entrada",

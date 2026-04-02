@@ -242,6 +242,21 @@ export function EmailPage({ dict, lang }: EmailPageProps) {
             </p>
           </div>
 
+          {/* Tutorial Section */}
+          <div className="rounded-lg border border-border bg-card p-4 text-sm">
+            <h3 className="mb-2 font-semibold text-foreground">{dict.hero.tutorialTitle}</h3>
+            <ul className="space-y-2 text-muted-foreground">
+              <li className="flex gap-2">
+                <span className="shrink-0 font-medium text-primary">1.</span>
+                <span>{dict.hero.tutorialStep1}</span>
+              </li>
+              <li className="flex gap-2">
+                <span className="shrink-0 font-medium text-amber-500">2.</span>
+                <span className="text-amber-500/90">{dict.hero.tutorialStep2}</span>
+              </li>
+            </ul>
+          </div>
+
           <EmailInput
             email={email}
             error={error}
