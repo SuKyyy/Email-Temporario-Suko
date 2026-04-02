@@ -5,7 +5,10 @@
   },
   "hero": {
     "title": "SuKo Temporary Email",
-    "subtitle": "Receive emails instantly on your domains."
+    "subtitle": "Receive emails instantly on your domains.",
+    "tutorialTitle": "How to use",
+    "tutorialStep1": "Enter the product email you purchased to receive verification codes or make account changes.",
+    "tutorialStep2": "You can remove the email from your account if you wish, but this will void the product warranty."
   },
   "emailInput": {
     "heading": "Access your Inbox",
