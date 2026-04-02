@@ -7,7 +7,7 @@ import { EmailInput } from "@/components/email-input"
 import { Inbox, type Email } from "@/components/mail-inbox"
 import type { Dictionary } from "@/lib/i18n"
 
-const POLL_SECONDS = 10
+const POLL_SECONDS = 7
 
 // Generate a short notification sound using Web Audio API
 function playNotificationSound() {
@@ -52,6 +52,7 @@ export function EmailPage({ dict, lang }: EmailPageProps) {
   const [hasSearched, setHasSearched] = useState(false)
   const [statusMessage, setStatusMessage] = useState<string | null>(null)
   const [countdown, setCountdown] = useState(POLL_SECONDS)
+  const [isPageVisible, setIsPageVisible] = useState(true)
 
   // Refs to avoid stale closures in the interval
   const activeUserRef = useRef(activeUser)
@@ -69,6 +70,23 @@ export function EmailPage({ dict, lang }: EmailPageProps) {
   useEffect(() => {
     requestNotificationPermission()
   }, [])
+
+  // Track page visibility to pause polling when tab is hidden
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      const visible = document.visibilityState === "visible"
+      setIsPageVisible(visible)
+      // Reset countdown when page becomes visible again
+      if (visible && activeUser && activeDomain) {
+        setCountdown(POLL_SECONDS)
+      }
+    }
+
+    document.addEventListener("visibilitychange", handleVisibilityChange)
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange)
+    }
+  }, [activeUser, activeDomain])
 
   function showBrowserNotification(subject: string, from: string) {
     if (typeof window !== "undefined" && "Notification" in window && Notification.permission === "granted") {
@@ -123,13 +141,17 @@ export function EmailPage({ dict, lang }: EmailPageProps) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dict])
 
-  // Auto-poll: countdown every second, fetch when it reaches 0
+  // Smart polling: countdown every second, fetch when it reaches 0
+  // Pauses when page is not visible to save server resources
   useEffect(() => {
     if (!activeUser || !activeDomain) return
 
     setCountdown(POLL_SECONDS)
 
     const interval = setInterval(() => {
+      // Skip countdown and fetch if page is not visible
+      if (!isPageVisible) return
+
       setCountdown((prev) => {
         if (prev <= 1) {
           if (!fetchingRef.current && activeUserRef.current && activeDomainRef.current) {
@@ -158,8 +180,11 @@ export function EmailPage({ dict, lang }: EmailPageProps) {
       })
     }, 1000)
 
-    return () => clearInterval(interval)
-  }, [activeUser, activeDomain, fetchEmails, checkForNewEmails])
+    return () => {
+      clearInterval(interval)
+      fetchingRef.current = false
+    }
+  }, [activeUser, activeDomain, fetchEmails, checkForNewEmails, isPageVisible])
 
   const handleCheckMail = useCallback(async () => {
     const trimmed = email.trim()
