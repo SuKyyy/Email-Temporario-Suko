@@ -2,7 +2,6 @@
 
 import { useState, useCallback, useEffect, useRef } from "react"
 import { toast } from "sonner"
-import { AlertTriangle, ExternalLink, X } from "lucide-react"
 import { SiteHeader } from "@/components/site-header"
 import { EmailInput } from "@/components/email-input"
 import { Inbox, type Email } from "@/components/mail-inbox"
@@ -36,59 +35,12 @@ function requestNotificationPermission() {
   }
 }
 
-const NEW_URL = "https://tempmailsuko.shop/"
-
-function MigrationModal({ onClose }: { onClose: () => void }) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-      <div className="bg-zinc-900 border border-zinc-800 text-white rounded-xl p-6 max-w-md w-full text-center relative">
-        <button
-          onClick={onClose}
-          className="absolute top-3 right-3 text-zinc-500 hover:text-zinc-300 transition-colors"
-          aria-label="Fechar"
-        >
-          <X className="h-5 w-5" />
-        </button>
-        
-        <div className="flex justify-center mb-4">
-          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-amber-500/20">
-            <AlertTriangle className="h-8 w-8 text-amber-500" />
-          </div>
-        </div>
-        
-        <h2 className="text-xl font-bold mb-2">Mudamos de Endereco!</h2>
-        <p className="text-zinc-400 mb-6">
-          O painel de E-mail Temporario da SuKoShop mudou para um link oficial mais rapido. Salve o novo link!
-        </p>
-        
-        <a
-          href={NEW_URL}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white w-full py-3 rounded-lg font-medium transition-colors mb-3"
-        >
-          <ExternalLink className="h-4 w-4" />
-          Acessar Novo Site
-        </a>
-        
-        <button
-          onClick={onClose}
-          className="w-full py-3 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors font-medium"
-        >
-          Continuar no site antigo
-        </button>
-      </div>
-    </div>
-  )
-}
-
 interface EmailPageProps {
   dict: Dictionary
   lang: string
 }
 
 export function EmailPage({ dict, lang }: EmailPageProps) {
-  const [showModal, setShowModal] = useState(true)
   const [email, setEmail] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [emails, setEmails] = useState<Email[]>([])
@@ -277,7 +229,6 @@ export function EmailPage({ dict, lang }: EmailPageProps) {
 
   return (
     <div className="flex min-h-screen flex-col">
-      {showModal && <MigrationModal onClose={() => setShowModal(false)} />}
       <SiteHeader lang={lang} />
 
       <main className="flex flex-1 items-start justify-center px-4 py-12 sm:py-20">
