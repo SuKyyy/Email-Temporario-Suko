@@ -183,9 +183,16 @@ export async function GET(request: NextRequest) {
     accounts.push({ name: "ultra", user: ultraUser, pass: ultraPass })
   }
 
+  // Account 3: ultratheadmin@thesukogpt.shop
+  const gptUser = process.env.IMAP_USER_GPT || "ultratheadmin@thesukogpt.shop"
+  const gptPass = process.env.IMAP_PASS_GPT || ""
+  if (gptPass) {
+    accounts.push({ name: "gpt", user: gptUser, pass: gptPass })
+  }
+
   if (accounts.length === 0) {
     return NextResponse.json(
-      { error: "Nenhuma credencial IMAP configurada. Verifique IMAP_PASS_CURSOR e IMAP_PASS_ULTRA." },
+      { error: "Nenhuma credencial IMAP configurada. Verifique IMAP_PASS_CURSOR, IMAP_PASS_ULTRA e IMAP_PASS_GPT." },
       { status: 500 }
     )
   }
