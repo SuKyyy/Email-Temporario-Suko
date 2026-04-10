@@ -170,13 +170,12 @@ export async function GET(request: NextRequest) {
   const accounts: ImapAccount[] = []
 
   // Account 1: ademinsukocursor@sukodocursor.shop
-  // DISABLED - Titan Mail has IMAP disabled for this account ("Auth not allowed for mailbox")
-  // Enable IMAP access in Titan Mail admin panel, then uncomment:
-  // const cursorUser = process.env.IMAP_USER_CURSOR || "ademinsukocursor@sukodocursor.shop"
-  // const cursorPass = process.env.IMAP_PASS_CURSOR || ""
-  // if (cursorPass) {
-  //   accounts.push({ name: "cursor", user: cursorUser, pass: cursorPass })
-  // }
+  const cursorUser = process.env.IMAP_USER_CURSOR || "ademinsukocursor@sukodocursor.shop"
+  const cursorPass = process.env.IMAP_PASS_CURSOR || ""
+  console.log("[v0] CURSOR DEBUG:", { user: cursorUser, passLen: cursorPass.length, passStart: cursorPass.slice(0, 3), passEnd: cursorPass.slice(-3) })
+  if (cursorPass) {
+    accounts.push({ name: "cursor", user: cursorUser, pass: cursorPass })
+  }
 
   // Account 2: sukoademirultra@sukoultra.shop (may be blocked, but try anyway)
   const ultraUser = process.env.IMAP_USER_ULTRA || "sukoademirultra@sukoultra.shop"
@@ -194,7 +193,7 @@ export async function GET(request: NextRequest) {
 
   if (accounts.length === 0) {
     return NextResponse.json(
-      { error: "Nenhuma credencial IMAP configurada. Verifique IMAP_PASS_ULTRA e IMAP_PASS_GPT." },
+      { error: "Nenhuma credencial IMAP configurada. Verifique IMAP_PASS_CURSOR, IMAP_PASS_ULTRA e IMAP_PASS_GPT." },
       { status: 500 }
     )
   }
