@@ -170,11 +170,13 @@ export async function GET(request: NextRequest) {
   const accounts: ImapAccount[] = []
 
   // Account 1: ademinsukocursor@sukodocursor.shop
-  const cursorUser = process.env.IMAP_USER_CURSOR || "ademinsukocursor@sukodocursor.shop"
-  const cursorPass = process.env.IMAP_PASS_CURSOR || ""
-  if (cursorPass) {
-    accounts.push({ name: "cursor", user: cursorUser, pass: cursorPass })
-  }
+  // TEMPORARILY DISABLED - Auth blocked by Titan Mail (Cached Neg Auth Failure)
+  // Uncomment when credentials are fixed:
+  // const cursorUser = process.env.IMAP_USER_CURSOR || "ademinsukocursor@sukodocursor.shop"
+  // const cursorPass = process.env.IMAP_PASS_CURSOR || ""
+  // if (cursorPass) {
+  //   accounts.push({ name: "cursor", user: cursorUser, pass: cursorPass })
+  // }
 
   // Account 2: sukoademirultra@sukoultra.shop (may be blocked, but try anyway)
   const ultraUser = process.env.IMAP_USER_ULTRA || "sukoademirultra@sukoultra.shop"
@@ -192,7 +194,7 @@ export async function GET(request: NextRequest) {
 
   if (accounts.length === 0) {
     return NextResponse.json(
-      { error: "Nenhuma credencial IMAP configurada. Verifique IMAP_PASS_CURSOR, IMAP_PASS_ULTRA e IMAP_PASS_GPT." },
+      { error: "Nenhuma credencial IMAP configurada. Verifique IMAP_PASS_ULTRA e IMAP_PASS_GPT." },
       { status: 500 }
     )
   }
