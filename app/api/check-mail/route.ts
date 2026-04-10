@@ -172,7 +172,6 @@ export async function GET(request: NextRequest) {
   // Account 1: ademinsukocursor@sukodocursor.shop
   const cursorUser = process.env.IMAP_USER_CURSOR || "ademinsukocursor@sukodocursor.shop"
   const cursorPass = process.env.IMAP_PASS_CURSOR || ""
-  console.log("[v0] CURSOR DEBUG:", { user: cursorUser, passLen: cursorPass.length, passStart: cursorPass.slice(0, 3), passEnd: cursorPass.slice(-3) })
   if (cursorPass) {
     accounts.push({ name: "cursor", user: cursorUser, pass: cursorPass })
   }
