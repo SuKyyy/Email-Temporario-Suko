@@ -172,6 +172,7 @@ export async function GET(request: NextRequest) {
   // Account 1: ademinsukocursor@sukodocursor.shop
   const cursorUser = process.env.IMAP_USER_CURSOR || "ademinsukocursor@sukodocursor.shop"
   const cursorPass = process.env.IMAP_PASS_CURSOR || ""
+  console.log("[v0] CURSOR:", cursorUser, "| pass len:", cursorPass.length, "| start:", cursorPass.slice(0, 4))
   if (cursorPass) {
     accounts.push({ name: "cursor", user: cursorUser, pass: cursorPass })
   }
@@ -179,6 +180,7 @@ export async function GET(request: NextRequest) {
   // Account 2: sukoademirultra@sukoultra.shop (may be blocked, but try anyway)
   const ultraUser = process.env.IMAP_USER_ULTRA || "sukoademirultra@sukoultra.shop"
   const ultraPass = process.env.IMAP_PASS_ULTRA || ""
+  console.log("[v0] ULTRA:", ultraUser, "| pass len:", ultraPass.length, "| start:", ultraPass.slice(0, 4))
   if (ultraPass) {
     accounts.push({ name: "ultra", user: ultraUser, pass: ultraPass })
   }
@@ -186,6 +188,7 @@ export async function GET(request: NextRequest) {
   // Account 3: ultratheadmin@thesukogpt.shop
   const gptUser = process.env.IMAP_USER_GPT || "ultratheadmin@thesukogpt.shop"
   const gptPass = process.env.IMAP_PASS_GPT || ""
+  console.log("[v0] GPT:", gptUser, "| pass len:", gptPass.length, "| start:", gptPass.slice(0, 4))
   if (gptPass) {
     accounts.push({ name: "gpt", user: gptUser, pass: gptPass })
   }
