@@ -190,6 +190,9 @@ export async function GET(request: NextRequest) {
     accounts.push({ name: "gpt", user: gptUser, pass: gptPass })
   }
 
+  console.log("[v0] Accounts configured:", accounts.map(a => `${a.name}(${a.user})`).join(", "))
+  console.log("[v0] ULTRA pass length:", ultraPass.length, "| GPT pass length:", gptPass.length, "| CURSOR pass length:", cursorPass.length)
+
   if (accounts.length === 0) {
     return NextResponse.json(
       { error: "Nenhuma credencial IMAP configurada. Verifique IMAP_PASS_CURSOR, IMAP_PASS_ULTRA e IMAP_PASS_GPT." },
