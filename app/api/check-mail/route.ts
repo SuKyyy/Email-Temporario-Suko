@@ -59,11 +59,8 @@ async function fetchEmailsFromAccount(
       },
     }
 
-    console.log(`[v0] [${account.name}] Connecting to ${imapHost}:${imapPort}...`)
     connection = await imapSimple.connect(config)
-    console.log(`[v0] [${account.name}] Connected! Opening INBOX...`)
     await connection.openBox("INBOX")
-    console.log(`[v0] [${account.name}] INBOX opened`)
 
     // Fetch only recent emails (last 7 days) to speed up search
     const sevenDaysAgo = new Date()
@@ -76,10 +73,8 @@ async function fetchEmailsFromAccount(
     }
 
     const allMessages = await connection.search(searchCriteria, fetchOptions)
-    console.log(`[v0] [${account.name}] Found ${allMessages.length} messages from last 7 days`)
     // Get only last 20 messages for faster processing
     const recentBatch = allMessages.slice(-20).reverse()
-    console.log(`[v0] [${account.name}] Processing ${recentBatch.length} most recent messages`)
 
     const targetLower = targetAddress.toLowerCase()
 
@@ -135,10 +130,9 @@ async function fetchEmailsFromAccount(
       }
     }
 
-    console.log(`[v0] [${account.name}] Matched ${matchedEmails.length} emails for ${targetAddress}`)
     connection.end()
   } catch (err) {
-    console.error(`[v0] [IMAP] Error fetching from ${account.name}:`, err)
+    console.error(`[IMAP] Error fetching from ${account.name}:`, err)
     // Don't throw - allow other account to still return results
   } finally {
     if (connection) {
@@ -178,21 +172,11 @@ export async function GET(request: NextRequest) {
   // Main account: ultratheadmin@thesukogpt.shop
   const gptUser = process.env.IMAP_USER_GPT || "ultratheadmin@thesukogpt.shop"
   const gptPass = process.env.IMAP_PASS_GPT || ""
-  
-  console.log("[v0] === IMAP DEBUG ===")
-  console.log("[v0] IMAP_HOST:", imapHost)
-  console.log("[v0] IMAP_PORT:", imapPort)
-  console.log("[v0] IMAP_USER_GPT:", gptUser)
-  console.log("[v0] IMAP_PASS_GPT length:", gptPass.length)
-  console.log("[v0] IMAP_PASS_GPT preview:", gptPass.substring(0, 4) + "***")
-  console.log("[v0] Searching for address:", fullAddress)
-  
   if (gptPass) {
     accounts.push({ name: "gpt", user: gptUser, pass: gptPass })
   }
 
   if (accounts.length === 0) {
-    console.error("[v0] ERROR: No IMAP credentials configured")
     return NextResponse.json(
       { error: "Nenhuma credencial IMAP configurada. Verifique IMAP_PASS_GPT." },
       { status: 500 }
