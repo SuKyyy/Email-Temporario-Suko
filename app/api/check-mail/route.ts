@@ -169,16 +169,16 @@ export async function GET(request: NextRequest) {
   // Define the account to fetch from
   const accounts: ImapAccount[] = []
 
-  // Main IMAP account
-  const imapUser = process.env.IMAP_USER || ""
+  // Main IMAP account: abusadordoamin@thesuaky.shop
+  const imapUser = "abusadordoamin@thesuaky.shop"
   const imapPass = process.env.IMAP_PASS || ""
-  if (imapUser && imapPass) {
+  if (imapPass) {
     accounts.push({ name: "main", user: imapUser, pass: imapPass })
   }
 
   if (accounts.length === 0) {
     return NextResponse.json(
-      { error: "Nenhuma credencial IMAP configurada. Verifique IMAP_USER e IMAP_PASS." },
+      { error: "Nenhuma credencial IMAP configurada. Verifique IMAP_PASS." },
       { status: 500 }
     )
   }
