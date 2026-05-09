@@ -163,16 +163,14 @@ export async function GET(request: NextRequest) {
   const normalizedDomain = rawDomain.startsWith("@") ? rawDomain : `@${rawDomain}`
   const fullAddress = `${user}${normalizedDomain}`
 
-  // Force correct Titan Mail IMAP settings (ignore env vars for host/port)
+  // HARDCODED Titan Mail IMAP settings - do NOT use env vars
   const imapHost = "imap.titan.email"
   const imapPort = 993
+  const imapUser = "abusadordoamin@thesuaky.shop"
+  const imapPass = process.env.IMAP_PASS || ""
 
   // Define the account to fetch from
   const accounts: ImapAccount[] = []
-
-  // Main IMAP account: abusadordoamin@thesuaky.shop
-  const imapUser = "abusadordoamin@thesuaky.shop"
-  const imapPass = process.env.IMAP_PASS || ""
   if (imapPass) {
     accounts.push({ name: "main", user: imapUser, pass: imapPass })
   }
