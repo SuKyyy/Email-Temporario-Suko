@@ -170,8 +170,10 @@ export async function GET(request: NextRequest) {
   const accounts: ImapAccount[] = []
 
   // Main IMAP account: abusadordoamin@thesuaky.shop
-  const imapUser = "abusadordoamin@thesuaky.shop"
+  const imapUser = process.env.IMAP_USER || "abusadordoamin@thesuaky.shop"
   const imapPass = process.env.IMAP_PASS || ""
+  
+  console.log("[v0] IMAP Config - Host:", imapHost, "Port:", imapPort, "User:", imapUser, "Pass length:", imapPass.length)
   if (imapPass) {
     accounts.push({ name: "main", user: imapUser, pass: imapPass })
   }
