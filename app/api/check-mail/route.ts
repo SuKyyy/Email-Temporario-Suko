@@ -163,22 +163,23 @@ export async function GET(request: NextRequest) {
   const normalizedDomain = rawDomain.startsWith("@") ? rawDomain : `@${rawDomain}`
   const fullAddress = `${user}${normalizedDomain}`
 
-  const imapHost = process.env.IMAP_HOST || "imap.titan.email"
-  const imapPort = parseInt(process.env.IMAP_PORT || "993", 10)
+  // Force correct Titan Mail IMAP settings (ignore env vars for host/port)
+  const imapHost = "imap.titan.email"
+  const imapPort = 993
 
   // Define the account to fetch from
   const accounts: ImapAccount[] = []
 
-  // Main account: ultratheadmin@thesukogpt.shop
-  const gptUser = process.env.IMAP_USER_GPT || "ultratheadmin@thesukogpt.shop"
-  const gptPass = process.env.IMAP_PASS_GPT || ""
-  if (gptPass) {
-    accounts.push({ name: "gpt", user: gptUser, pass: gptPass })
+  // Main IMAP account: abusadordoamin@thesuaky.shop
+  const imapUser = "abusadordoamin@thesuaky.shop"
+  const imapPass = process.env.IMAP_PASS || ""
+  if (imapPass) {
+    accounts.push({ name: "main", user: imapUser, pass: imapPass })
   }
 
   if (accounts.length === 0) {
     return NextResponse.json(
-      { error: "Nenhuma credencial IMAP configurada. Verifique IMAP_PASS_GPT." },
+      { error: "Nenhuma credencial IMAP configurada. Verifique IMAP_PASS." },
       { status: 500 }
     )
   }
