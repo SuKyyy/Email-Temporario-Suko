@@ -39,6 +39,14 @@
     "emptyInbox": "Your inbox is empty. New messages will appear here automatically.",
     "enterEmailPrompt": "Enter an email above and click 'Access Email' to check your inbox."
   },
+  "sidebar": {
+    "title": "Saved Emails",
+    "noSavedEmails": "No saved emails",
+    "addEmailPrompt": "Add emails using the field above",
+    "remove": "Remove",
+    "online": "Online",
+    "recheck": "Re-check"
+  },
   "notifications": {
     "newEmailBrowser": "New email received!",
     "from": "From",
