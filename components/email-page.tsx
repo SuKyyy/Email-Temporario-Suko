@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect } from "react"
 import { toast } from "sonner"
-import { Trash2, RefreshCw, Copy, Mail, Send, FileCode, ExternalLink } from "lucide-react"
+import { Trash2, RefreshCw, Copy, Mail, Send, FileCode, ExternalLink, ChevronLeft, ChevronRight, X } from "lucide-react"
 import { SiteHeader } from "@/components/site-header"
 import { Inbox, type Email } from "@/components/mail-inbox"
 import type { Dictionary } from "@/lib/i18n"
@@ -26,6 +26,7 @@ interface EmailPageProps {
 
 export function EmailPage({ dict, lang }: EmailPageProps) {
   const [inputEmail, setInputEmail] = useState("")
+  const [headerInputEmail, setHeaderInputEmail] = useState("")
   const [error, setError] = useState<string | null>(null)
   const [emails, setEmails] = useState<Email[]>([])
   const [loading, setLoading] = useState(false)
@@ -33,6 +34,8 @@ export function EmailPage({ dict, lang }: EmailPageProps) {
   const [selectedEmail, setSelectedEmail] = useState<string | null>(null)
   const [savedEmails, setSavedEmails] = useState<SavedEmail[]>([])
   const [statusMessage, setStatusMessage] = useState<string | null>(null)
+  const [leftSidebarCollapsed, setLeftSidebarCollapsed] = useState(false)
+  const [rightSidebarCollapsed, setRightSidebarCollapsed] = useState(false)
 
   // Load saved emails from localStorage
   useEffect(() => {
@@ -163,6 +166,14 @@ export function EmailPage({ dict, lang }: EmailPageProps) {
     }
   }, [selectedEmail, savedEmails])
 
+  const handleRemoveAllEmails = useCallback(() => {
+    setSavedEmails([])
+    setSelectedEmail(null)
+    setEmails([])
+    localStorage.removeItem(STORAGE_KEY)
+    toast.success("Todos os emails removidos")
+  }, [])
+
   const handleRefresh = useCallback(async () => {
     if (!selectedEmail) return
 
@@ -202,13 +213,105 @@ export function EmailPage({ dict, lang }: EmailPageProps) {
     }
   }, [handleAddEmail])
 
+  const handleHeaderInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setHeaderInputEmail(e.target.value)
+  }, [])
+
+  const handleHeaderAddEmail = useCallback(async () => {
+    const trimmed = headerInputEmail.trim().toLowerCase()
+    if (!trimmed) return
+
+    const atIndex = trimmed.lastIndexOf("@")
+    if (atIndex === -1) {
+      toast.error(dict.errors.invalidFormat)
+      return
+    }
+
+    const user = trimmed.slice(0, atIndex)
+    if (!user) {
+      toast.error(dict.errors.noUsername)
+      return
+    }
+
+    // Check if already saved
+    if (savedEmails.some(e => e.address === trimmed)) {
+      setSelectedEmail(trimmed)
+      setHeaderInputEmail("")
+      setLoading(true)
+      try {
+        const result = await fetchEmails(trimmed)
+        setEmails(result)
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : dict.errors.genericError)
+      } finally {
+        setLoading(false)
+      }
+      return
+    }
+
+    setLoading(true)
+
+    try {
+      const result = await fetchEmails(trimmed)
+      setSavedEmails(prev => [...prev, { address: trimmed, addedAt: Date.now() }])
+      setSelectedEmail(trimmed)
+      setEmails(result)
+      setHeaderInputEmail("")
+      toast.success("Email adicionado")
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : dict.errors.genericError)
+    } finally {
+      setLoading(false)
+    }
+  }, [headerInputEmail, savedEmails, fetchEmails, dict])
+
+  const handleHeaderKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === "Enter") {
+      handleHeaderAddEmail()
+    }
+  }, [handleHeaderAddEmail])
+
   return (
     <div className="flex min-h-screen flex-col bg-background">
       <SiteHeader lang={lang} />
 
-      <main className="flex flex-1">
+      {/* Header Input - shows when left sidebar is collapsed */}
+      {leftSidebarCollapsed && (
+        <div className="border-b border-border bg-card/50 px-4 py-2">
+          <div className="mx-auto flex max-w-md items-center gap-2">
+            <input
+              type="email"
+              value={headerInputEmail}
+              onChange={handleHeaderInputChange}
+              onKeyDown={handleHeaderKeyDown}
+              placeholder={dict.emailInput.placeholder}
+              className="flex-1 rounded-lg border border-border bg-background px-3 py-1.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+            />
+            <button
+              onClick={handleHeaderAddEmail}
+              disabled={loading || !headerInputEmail.trim()}
+              className="rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+            >
+              {loading ? "..." : dict.emailInput.submit}
+            </button>
+          </div>
+        </div>
+      )}
+
+      <main className="flex flex-1 relative">
         {/* Left Column - Title, Tutorial, Input, Saved Emails */}
-        <div className="w-full border-r border-border bg-card lg:w-96">
+        <div className={`relative border-r border-border bg-card transition-all duration-300 ${
+          leftSidebarCollapsed ? "w-0 overflow-hidden opacity-0" : "w-full lg:w-96"
+        }`}>
+          {/* Collapse button inside sidebar */}
+          {!leftSidebarCollapsed && (
+            <button
+              onClick={() => setLeftSidebarCollapsed(true)}
+              className="absolute right-2 top-2 z-10 rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+          )}
           <div className="p-4">
             {/* Title */}
             <div className="mb-4">
@@ -262,9 +365,20 @@ export function EmailPage({ dict, lang }: EmailPageProps) {
 
             {/* Saved Emails */}
             <div>
-              <h2 className="mb-2 text-sm font-semibold text-foreground">
-                {dict.sidebar.title}
-              </h2>
+              <div className="mb-2 flex items-center justify-between">
+                <h2 className="text-sm font-semibold text-foreground">
+                  {dict.sidebar.title}
+                </h2>
+                {savedEmails.length > 0 && (
+                  <button
+                    onClick={handleRemoveAllEmails}
+                    className="flex items-center gap-1 rounded px-2 py-0.5 text-xs text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                  >
+                    <X className="h-3 w-3" />
+                    Remover todos
+                  </button>
+                )}
+              </div>
               
               {savedEmails.length === 0 ? (
                 <div className="rounded-lg border border-dashed border-border p-3 text-center">
@@ -334,7 +448,26 @@ export function EmailPage({ dict, lang }: EmailPageProps) {
         </div>
 
         {/* Center - Inbox (smaller) */}
-        <div className="flex-1 flex flex-col min-w-0">
+        <div className="flex-1 flex flex-col min-w-0 relative">
+          {/* Expand left sidebar button */}
+          {leftSidebarCollapsed && (
+            <button
+              onClick={() => setLeftSidebarCollapsed(false)}
+              className="absolute left-2 top-2 z-10 rounded-lg border border-border bg-card p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          )}
+          
+          {/* Expand right sidebar button */}
+          {rightSidebarCollapsed && (
+            <button
+              onClick={() => setRightSidebarCollapsed(false)}
+              className="absolute right-2 top-2 z-10 rounded-lg border border-border bg-card p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+          )}
           <div className="flex-1 p-4 max-w-2xl">
             {selectedEmail ? (
               <div className="h-full">
@@ -425,8 +558,19 @@ export function EmailPage({ dict, lang }: EmailPageProps) {
         </div>
 
         {/* Right Column - Links (TG, GGMax, Methods) */}
-        <div className="hidden w-64 border-l border-border bg-card p-4 xl:block">
-          <h3 className="mb-3 text-sm font-semibold text-foreground">Links</h3>
+        <div className={`border-l border-border bg-card transition-all duration-300 ${
+          rightSidebarCollapsed ? "w-0 overflow-hidden opacity-0" : "hidden w-64 xl:block"
+        }`}>
+          <div className="relative p-4">
+            {/* Collapse button */}
+            <button
+              onClick={() => setRightSidebarCollapsed(true)}
+              className="absolute right-2 top-2 rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
+            
+            <h3 className="mb-3 text-sm font-semibold text-foreground">Links</h3>
           
           {/* Telegram */}
           <a
@@ -485,6 +629,7 @@ export function EmailPage({ dict, lang }: EmailPageProps) {
               <ExternalLink className="ml-auto h-4 w-4 text-muted-foreground" />
             )}
           </a>
+          </div>
         </div>
       </main>
 
