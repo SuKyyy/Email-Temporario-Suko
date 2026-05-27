@@ -20,6 +20,9 @@ const dict = {
   hero: {
     title: "Email Temporário SuKo",
     subtitle: "Receba emails instantaneamente nos seus domínios.",
+    tutorialTitle: "Como usar",
+    tutorialStep1: "Digite o email do produto que voce comprou para receber codigos de verificacao ou fazer alteracoes na conta.",
+    tutorialStep2: "Voce pode remover o email da sua conta se quiser, mas isso causara a perda da garantia do produto.",
   },
   emailInput: {
     heading: "Acesse sua Caixa de Entrada",
@@ -74,6 +77,14 @@ const dict = {
   metadata: {
     title: "SuKo Shop - Email Temporário",
     description: "Acesse sua caixa de entrada temporária nos domínios SuKo",
+  },
+  sidebar: {
+    title: "Emails Salvos",
+    noSavedEmails: "Nenhum email salvo",
+    addEmailPrompt: "Adicione emails usando o campo acima",
+    remove: "Remover",
+    online: "Online",
+    recheck: "Verificar",
   },
 }
 
