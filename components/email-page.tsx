@@ -276,10 +276,10 @@ export function EmailPage({ dict, lang }: EmailPageProps) {
     <div className="flex min-h-screen flex-col bg-background">
       <SiteHeader lang={lang} />
 
-      {/* Header Input - shows when left sidebar is collapsed */}
+      {/* Header Input - shows when left sidebar is collapsed (md+) */}
       {leftSidebarCollapsed && (
-        <div className="border-b border-border bg-card/50 px-4 py-2">
-          <div className="mx-auto max-w-md">
+        <div className="hidden md:block border-b border-border bg-card/50 px-4 py-2">
+          <div className="mx-auto max-w-lg">
             <div className="flex items-center gap-2">
               <input
                 type="email"
@@ -365,16 +365,16 @@ export function EmailPage({ dict, lang }: EmailPageProps) {
         </div>
       )}
 
-      <main className="flex flex-1 relative">
+      <main className="flex flex-1 flex-col md:flex-row relative">
         {/* Left Column - Title, Tutorial, Input, Saved Emails */}
-        <div className={`relative border-r border-border bg-card transition-all duration-300 ${
-          leftSidebarCollapsed ? "w-0 overflow-hidden opacity-0" : "w-full lg:w-96"
+        <div className={`relative border-b md:border-b-0 md:border-r border-border bg-card transition-all duration-300 ${
+          leftSidebarCollapsed ? "hidden" : "w-full md:w-80 lg:w-96 shrink-0"
         }`}>
-          {/* Collapse button inside sidebar */}
+          {/* Collapse button inside sidebar - only on md+ */}
           {!leftSidebarCollapsed && (
             <button
               onClick={() => setLeftSidebarCollapsed(true)}
-              className="absolute right-2 top-2 z-10 rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              className="absolute right-2 top-2 z-10 hidden md:block rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
             >
               <ChevronLeft className="h-4 w-4" />
             </button>
@@ -516,26 +516,26 @@ export function EmailPage({ dict, lang }: EmailPageProps) {
 
         {/* Center - Inbox */}
         <div className="flex-1 flex flex-col min-w-0 relative">
-          {/* Expand left sidebar button */}
+          {/* Expand left sidebar button - only on md+ */}
           {leftSidebarCollapsed && (
             <button
               onClick={() => setLeftSidebarCollapsed(false)}
-              className="absolute left-2 top-2 z-10 rounded-lg border border-border bg-card p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              className="absolute left-2 top-2 z-10 hidden md:block rounded-lg border border-border bg-card p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
             >
               <ChevronRight className="h-4 w-4" />
             </button>
           )}
           
-          {/* Expand right sidebar button */}
+          {/* Expand right sidebar button - only on xl+ */}
           {rightSidebarCollapsed && (
             <button
               onClick={() => setRightSidebarCollapsed(false)}
-              className="absolute right-2 top-2 z-10 rounded-lg border border-border bg-card p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              className="absolute right-2 top-2 z-10 hidden xl:block rounded-lg border border-border bg-card p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
             >
               <ChevronLeft className="h-4 w-4" />
             </button>
           )}
-          <div className="flex-1 p-4 w-full">
+          <div className="flex-1 p-2 sm:p-4 w-full overflow-x-hidden">
             {selectedEmail ? (
               <div className="h-full">
                 {/* Selected Email Header */}
@@ -624,9 +624,9 @@ export function EmailPage({ dict, lang }: EmailPageProps) {
           </div>
         </div>
 
-        {/* Right Column - Links (TG, GGMax, Methods) */}
-        <div className={`border-l border-border bg-card transition-all duration-300 ${
-          rightSidebarCollapsed ? "w-0 overflow-hidden opacity-0" : "hidden w-64 xl:block"
+        {/* Right Column - Links (TG, GGMax, Methods) - only xl+ */}
+        <div className={`border-t md:border-t-0 md:border-l border-border bg-card transition-all duration-300 ${
+          rightSidebarCollapsed ? "hidden" : "hidden xl:block w-56 shrink-0"
         }`}>
           <div className="relative p-4">
             {/* Collapse button */}
