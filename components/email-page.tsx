@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useEffect } from "react"
 import { toast } from "sonner"
-import { Trash2, RefreshCw, Copy, Mail, Send, FileCode, ExternalLink, ChevronLeft, ChevronRight, X } from "lucide-react"
+import { Trash2, RefreshCw, Copy, Mail, Send, FileCode, ExternalLink, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, X } from "lucide-react"
 import { SiteHeader } from "@/components/site-header"
 import { Inbox, type Email } from "@/components/mail-inbox"
 import type { Dictionary } from "@/lib/i18n"
@@ -36,6 +36,7 @@ export function EmailPage({ dict, lang }: EmailPageProps) {
   const [statusMessage, setStatusMessage] = useState<string | null>(null)
   const [leftSidebarCollapsed, setLeftSidebarCollapsed] = useState(false)
   const [rightSidebarCollapsed, setRightSidebarCollapsed] = useState(false)
+  const [headerDropdownOpen, setHeaderDropdownOpen] = useState(false)
 
   // Load saved emails from localStorage
   useEffect(() => {
@@ -278,22 +279,88 @@ export function EmailPage({ dict, lang }: EmailPageProps) {
       {/* Header Input - shows when left sidebar is collapsed */}
       {leftSidebarCollapsed && (
         <div className="border-b border-border bg-card/50 px-4 py-2">
-          <div className="mx-auto flex max-w-md items-center gap-2">
-            <input
-              type="email"
-              value={headerInputEmail}
-              onChange={handleHeaderInputChange}
-              onKeyDown={handleHeaderKeyDown}
-              placeholder={dict.emailInput.placeholder}
-              className="flex-1 rounded-lg border border-border bg-background px-3 py-1.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
-            />
-            <button
-              onClick={handleHeaderAddEmail}
-              disabled={loading || !headerInputEmail.trim()}
-              className="rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
-            >
-              {loading ? "..." : dict.emailInput.submit}
-            </button>
+          <div className="mx-auto max-w-md">
+            <div className="flex items-center gap-2">
+              <input
+                type="email"
+                value={headerInputEmail}
+                onChange={handleHeaderInputChange}
+                onKeyDown={handleHeaderKeyDown}
+                placeholder={dict.emailInput.placeholder}
+                className="flex-1 rounded-lg border border-border bg-background px-3 py-1.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+              />
+              <button
+                onClick={handleHeaderAddEmail}
+                disabled={loading || !headerInputEmail.trim()}
+                className="rounded-lg bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+              >
+                {loading ? "..." : dict.emailInput.submit}
+              </button>
+              {savedEmails.length > 0 && (
+                <button
+                  onClick={() => setHeaderDropdownOpen(!headerDropdownOpen)}
+                  className="rounded-lg border border-border bg-background p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                >
+                  {headerDropdownOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                </button>
+              )}
+            </div>
+            
+            {/* Dropdown with saved emails */}
+            {headerDropdownOpen && savedEmails.length > 0 && (
+              <div className="mt-2 rounded-lg border border-border bg-card p-2 shadow-lg">
+                <div className="mb-2 flex items-center justify-between">
+                  <span className="text-xs font-medium text-muted-foreground">Emails Salvos</span>
+                  <button
+                    onClick={handleRemoveAllEmails}
+                    className="text-xs text-muted-foreground hover:text-destructive"
+                  >
+                    Limpar todos
+                  </button>
+                </div>
+                <div className="max-h-48 space-y-1 overflow-y-auto">
+                  {savedEmails.map((saved) => (
+                    <div
+                      key={saved.address}
+                      className={`flex items-center justify-between rounded-md px-2 py-1.5 text-xs cursor-pointer transition-colors ${
+                        selectedEmail === saved.address
+                          ? "bg-primary/10 text-primary"
+                          : "hover:bg-muted text-foreground"
+                      }`}
+                      onClick={() => {
+                        handleSelectEmail(saved.address)
+                        setHeaderDropdownOpen(false)
+                      }}
+                    >
+                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                        <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" />
+                        <span className="truncate">{saved.address}</span>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleCopyEmail(saved.address)
+                          }}
+                          className="rounded p-0.5 hover:bg-muted"
+                        >
+                          <Copy className="h-3 w-3" />
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleRemoveEmail(saved.address)
+                          }}
+                          className="rounded p-0.5 hover:bg-destructive/10 hover:text-destructive"
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
