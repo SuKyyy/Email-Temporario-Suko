@@ -2,12 +2,17 @@
 
 import { useState, useCallback, useEffect } from "react"
 import { toast } from "sonner"
-import { Trash2, RefreshCw, Copy, Mail } from "lucide-react"
+import { Trash2, RefreshCw, Copy, Mail, Send, FileCode, ExternalLink } from "lucide-react"
 import { SiteHeader } from "@/components/site-header"
 import { Inbox, type Email } from "@/components/mail-inbox"
 import type { Dictionary } from "@/lib/i18n"
 
 const STORAGE_KEY = "suko_saved_emails"
+
+// Links
+const TELEGRAM_LINK = "https://t.me/sukodeuva"
+const GGMAX_LINK = "https://ggmax.com.br/perfil/SuKyNhoul"
+const METHODS_LINK = "#" // Placeholder - update when ready
 
 interface SavedEmail {
   address: string
@@ -37,7 +42,6 @@ export function EmailPage({ dict, lang }: EmailPageProps) {
         try {
           setSavedEmails(JSON.parse(stored))
         } catch {
-          // Invalid JSON, reset
           localStorage.removeItem(STORAGE_KEY)
         }
       }
@@ -98,7 +102,6 @@ export function EmailPage({ dict, lang }: EmailPageProps) {
     if (savedEmails.some(e => e.address === trimmed)) {
       setSelectedEmail(trimmed)
       setInputEmail("")
-      // Fetch emails for this address
       setLoading(true)
       try {
         const result = await fetchEmails(trimmed)
@@ -116,7 +119,6 @@ export function EmailPage({ dict, lang }: EmailPageProps) {
 
     try {
       const result = await fetchEmails(trimmed)
-      // Add to saved emails
       setSavedEmails(prev => [...prev, { address: trimmed, addedAt: Date.now() }])
       setSelectedEmail(trimmed)
       setEmails(result)
@@ -155,7 +157,6 @@ export function EmailPage({ dict, lang }: EmailPageProps) {
       setSelectedEmail(null)
       setEmails([])
     }
-    // Update localStorage
     const remaining = savedEmails.filter(e => e.address !== address)
     if (remaining.length === 0) {
       localStorage.removeItem(STORAGE_KEY)
@@ -205,23 +206,24 @@ export function EmailPage({ dict, lang }: EmailPageProps) {
     <div className="flex min-h-screen flex-col bg-background">
       <SiteHeader lang={lang} />
 
-      <main className="flex flex-1 flex-col">
-        {/* Header with title and input */}
-        <div className="border-b border-border bg-card px-4 py-6">
-          <div className="mx-auto max-w-7xl">
-            <div className="text-center mb-4">
-              <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+      <main className="flex flex-1">
+        {/* Left Column - Title, Tutorial, Input, Saved Emails */}
+        <div className="w-full border-r border-border bg-card lg:w-96">
+          <div className="p-4">
+            {/* Title */}
+            <div className="mb-4">
+              <h1 className="text-xl font-bold tracking-tight text-foreground">
                 {dict.hero.title}
               </h1>
-              <p className="mt-1 text-sm text-muted-foreground">
+              <p className="mt-1 text-xs text-muted-foreground">
                 {dict.hero.subtitle}
               </p>
             </div>
 
             {/* Tutorial Section */}
-            <div className="mx-auto max-w-2xl rounded-lg border border-border bg-background p-3 text-sm mb-4">
+            <div className="mb-4 rounded-lg border border-border bg-background p-3 text-xs">
               <h3 className="mb-2 font-semibold text-foreground">{dict.hero.tutorialTitle}</h3>
-              <ul className="space-y-1 text-muted-foreground">
+              <ul className="space-y-1.5 text-muted-foreground">
                 <li className="flex gap-2">
                   <span className="shrink-0 font-medium text-primary">1.</span>
                   <span>{dict.hero.tutorialStep1}</span>
@@ -234,7 +236,7 @@ export function EmailPage({ dict, lang }: EmailPageProps) {
             </div>
 
             {/* Email Input */}
-            <div className="mx-auto max-w-xl">
+            <div className="mb-4">
               <div className="flex gap-2">
                 <input
                   type="email"
@@ -242,100 +244,86 @@ export function EmailPage({ dict, lang }: EmailPageProps) {
                   onChange={handleInputChange}
                   onKeyDown={handleKeyDown}
                   placeholder={dict.emailInput.placeholder}
-                  className="flex-1 rounded-lg border border-border bg-background px-4 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                  className="flex-1 rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary"
                   aria-label={dict.emailInput.ariaLabel}
                 />
                 <button
                   onClick={handleAddEmail}
                   disabled={loading || !inputEmail.trim()}
-                  className="rounded-lg bg-primary px-6 py-2.5 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
                 >
-                  {loading ? dict.emailInput.loading : dict.emailInput.submit}
+                  {loading ? "..." : dict.emailInput.submit}
                 </button>
               </div>
               {error && (
-                <p className="mt-2 text-sm text-destructive">{error}</p>
+                <p className="mt-2 text-xs text-destructive">{error}</p>
               )}
             </div>
-          </div>
-        </div>
 
-        {/* Two Column Layout */}
-        <div className="flex flex-1 flex-col lg:flex-row">
-          {/* Left Sidebar - Saved Emails */}
-          <div className="w-full border-b border-border bg-card lg:w-80 lg:border-b-0 lg:border-r">
-            <div className="p-4">
-              <h2 className="mb-3 text-sm font-semibold text-foreground">
+            {/* Saved Emails */}
+            <div>
+              <h2 className="mb-2 text-sm font-semibold text-foreground">
                 {dict.sidebar.title}
               </h2>
               
               {savedEmails.length === 0 ? (
-                <div className="rounded-lg border border-dashed border-border p-4 text-center">
-                  <Mail className="mx-auto h-8 w-8 text-muted-foreground/50" />
-                  <p className="mt-2 text-sm text-muted-foreground">
+                <div className="rounded-lg border border-dashed border-border p-3 text-center">
+                  <Mail className="mx-auto h-6 w-6 text-muted-foreground/50" />
+                  <p className="mt-1 text-xs text-muted-foreground">
                     {dict.sidebar.noSavedEmails}
-                  </p>
-                  <p className="mt-1 text-xs text-muted-foreground/70">
-                    {dict.sidebar.addEmailPrompt}
                   </p>
                 </div>
               ) : (
-                <div className="space-y-2">
+                <div className="space-y-2 max-h-[300px] overflow-y-auto">
                   {savedEmails.map((saved) => (
                     <div
                       key={saved.address}
-                      className={`group relative rounded-lg border p-3 transition-colors cursor-pointer ${
+                      className={`group relative rounded-lg border p-2.5 transition-colors cursor-pointer ${
                         selectedEmail === saved.address
                           ? "border-primary bg-primary/5"
                           : "border-border hover:border-primary/50 hover:bg-muted/50"
                       }`}
                       onClick={() => handleSelectEmail(saved.address)}
                     >
-                      <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center justify-between gap-2">
                         <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-medium text-foreground">
+                          <p className="truncate text-xs font-medium text-foreground">
                             {saved.address}
                           </p>
-                          <div className="mt-1 flex items-center gap-2">
-                            <span className="inline-flex items-center gap-1 text-xs text-emerald-500">
-                              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                              {dict.sidebar.online}
-                            </span>
-                          </div>
+                          <span className="inline-flex items-center gap-1 text-xs text-emerald-500">
+                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                            {dict.sidebar.online}
+                          </span>
                         </div>
-                      </div>
-                      
-                      <div className="mt-2 flex items-center gap-1">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            handleCopyEmail(saved.address)
-                          }}
-                          className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                          aria-label={dict.emailInput.copyAriaLabel}
-                        >
-                          <Copy className="h-3.5 w-3.5" />
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            handleSelectEmail(saved.address)
-                          }}
-                          className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                          aria-label={dict.sidebar.recheck}
-                        >
-                          <RefreshCw className="h-3.5 w-3.5" />
-                        </button>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            handleRemoveEmail(saved.address)
-                          }}
-                          className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
-                          aria-label={dict.sidebar.remove}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
+                        <div className="flex items-center gap-0.5">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleCopyEmail(saved.address)
+                            }}
+                            className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                          >
+                            <Copy className="h-3 w-3" />
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleSelectEmail(saved.address)
+                            }}
+                            className="rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                          >
+                            <RefreshCw className="h-3 w-3" />
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              handleRemoveEmail(saved.address)
+                            }}
+                            className="rounded p-1 text-muted-foreground transition-colors hover:bg-destructive/10 hover:text-destructive"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                          </button>
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -343,15 +331,17 @@ export function EmailPage({ dict, lang }: EmailPageProps) {
               )}
             </div>
           </div>
+        </div>
 
-          {/* Right Side - Inbox */}
-          <div className="flex-1 p-4">
+        {/* Center - Inbox (smaller) */}
+        <div className="flex-1 flex flex-col min-w-0">
+          <div className="flex-1 p-4 max-w-2xl">
             {selectedEmail ? (
               <div className="h-full">
                 {/* Selected Email Header */}
-                <div className="mb-4 flex items-center justify-between rounded-lg border border-border bg-card p-3">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary font-semibold">
+                <div className="mb-3 flex items-center justify-between rounded-lg border border-border bg-card p-2.5">
+                  <div className="flex items-center gap-2">
+                    <div className="flex h-8 w-8 items-center justify-center rounded-full bg-primary/10 text-primary text-sm font-semibold">
                       {selectedEmail.charAt(0).toUpperCase()}
                     </div>
                     <div>
@@ -371,33 +361,29 @@ export function EmailPage({ dict, lang }: EmailPageProps) {
                       <p className="text-sm font-medium text-foreground">{selectedEmail}</p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1">
                     <button
                       onClick={() => handleCopyEmail(selectedEmail)}
-                      className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                      aria-label={dict.emailInput.copyAriaLabel}
+                      className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                     >
                       <Copy className="h-4 w-4" />
                     </button>
                     <button
                       onClick={handleRefresh}
                       disabled={refreshing}
-                      className="rounded-lg p-2 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
-                      aria-label={dict.inbox.refreshAriaLabel}
+                      className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground disabled:opacity-50"
                     >
                       <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
                     </button>
                   </div>
                 </div>
 
-                {/* Status Message */}
                 {statusMessage && (
-                  <div className="mb-4 rounded-lg bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
+                  <div className="mb-3 rounded-lg bg-muted/50 px-3 py-2 text-xs text-muted-foreground">
                     {statusMessage}
                   </div>
                 )}
 
-                {/* Inbox */}
                 <Inbox
                   emails={emails}
                   activeEmail={selectedEmail.split("@")[0]}
@@ -415,21 +401,94 @@ export function EmailPage({ dict, lang }: EmailPageProps) {
             ) : (
               <div className="flex h-full items-center justify-center">
                 <div className="text-center">
-                  <Mail className="mx-auto h-12 w-12 text-muted-foreground/30" />
-                  <p className="mt-4 text-lg font-medium text-muted-foreground">
+                  <Mail className="mx-auto h-10 w-10 text-muted-foreground/30" />
+                  <p className="mt-3 text-sm font-medium text-muted-foreground">
                     {dict.inbox.noEmailSelected}
                   </p>
-                  <p className="mt-1 text-sm text-muted-foreground/70">
+                  <p className="mt-1 text-xs text-muted-foreground/70">
                     {dict.inbox.enterEmailPrompt}
                   </p>
                 </div>
               </div>
             )}
           </div>
+
+          {/* Ads Section */}
+          <div className="border-t border-border bg-muted/30 p-4">
+            <div className="mx-auto max-w-2xl">
+              <div className="rounded-lg border border-dashed border-border bg-background p-6 text-center">
+                <p className="text-xs text-muted-foreground">Espaco para Anuncios</p>
+                {/* Ad code will go here */}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Right Column - Links (TG, GGMax, Methods) */}
+        <div className="hidden w-64 border-l border-border bg-card p-4 xl:block">
+          <h3 className="mb-3 text-sm font-semibold text-foreground">Links</h3>
+          
+          {/* Telegram */}
+          <a
+            href={TELEGRAM_LINK}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mb-3 flex items-center gap-3 rounded-lg border border-border bg-background p-3 transition-colors hover:border-primary/50 hover:bg-muted/50"
+          >
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-sky-500/10">
+              <Send className="h-5 w-5 text-sky-500" />
+            </div>
+            <div>
+              <p className="text-sm font-medium text-foreground">Telegram</p>
+              <p className="text-xs text-muted-foreground">@sukodeuva</p>
+            </div>
+            <ExternalLink className="ml-auto h-4 w-4 text-muted-foreground" />
+          </a>
+
+          {/* GGMax */}
+          <a
+            href={GGMAX_LINK}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mb-3 flex items-center gap-3 rounded-lg border border-border bg-background p-3 transition-colors hover:border-primary/50 hover:bg-muted/50"
+          >
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-500/10">
+              <span className="text-lg font-bold text-emerald-500">GG</span>
+            </div>
+            <div>
+              <p className="text-sm font-medium text-foreground">GGMax</p>
+              <p className="text-xs text-muted-foreground">SuKyNhoul</p>
+            </div>
+            <ExternalLink className="ml-auto h-4 w-4 text-muted-foreground" />
+          </a>
+
+          {/* Methods/HTMLs */}
+          <a
+            href={METHODS_LINK}
+            className={`flex items-center gap-3 rounded-lg border border-border bg-background p-3 transition-colors ${
+              METHODS_LINK === "#" 
+                ? "opacity-50 cursor-not-allowed" 
+                : "hover:border-primary/50 hover:bg-muted/50"
+            }`}
+            onClick={(e) => METHODS_LINK === "#" && e.preventDefault()}
+          >
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-violet-500/10">
+              <FileCode className="h-5 w-5 text-violet-500" />
+            </div>
+            <div>
+              <p className="text-sm font-medium text-foreground">Metodos</p>
+              <p className="text-xs text-muted-foreground">
+                {METHODS_LINK === "#" ? "Em breve..." : "HTMLs e mais"}
+              </p>
+            </div>
+            {METHODS_LINK !== "#" && (
+              <ExternalLink className="ml-auto h-4 w-4 text-muted-foreground" />
+            )}
+          </a>
         </div>
       </main>
 
-      <footer className="border-t border-border py-4 text-center text-xs text-muted-foreground">
+      <footer className="border-t border-border py-3 text-center text-xs text-muted-foreground">
         <p>{dict.footer.text}</p>
       </footer>
     </div>
