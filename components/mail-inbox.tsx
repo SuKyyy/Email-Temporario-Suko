@@ -253,28 +253,9 @@ export function Inbox({
         )}
         {activeEmail && (
           <div className="ml-auto flex items-center gap-3">
-            {statusMessage ? (
+            {statusMessage && (
               <span className="text-xs text-muted-foreground">
                 {statusMessage}
-              </span>
-            ) : (
-              <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                {isPolling ? (
-                  <>
-                    <Loader2 className="h-3 w-3 animate-spin text-accent" />
-                    <span>{dict.inbox.checking}</span>
-                  </>
-                ) : (
-                  <>
-                    <span className="relative flex h-1.5 w-1.5">
-                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-accent opacity-60" />
-                      <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-accent" />
-                    </span>
-                    {`${dict.inbox.updatesIn} `}
-                    {countdown}
-                    {dict.inbox.seconds}
-                  </>
-                )}
               </span>
             )}
             <button
@@ -293,17 +274,6 @@ export function Inbox({
           </div>
         )}
       </div>
-
-      {activeEmail && (
-        <div className="flex items-start gap-2.5 border-b border-border bg-amber-950/30 px-5 py-3">
-          <span className="mt-0.5 shrink-0 text-sm text-amber-400" aria-hidden="true">
-            {"⚠"}
-          </span>
-          <p className="text-xs leading-relaxed text-amber-200/80">
-            {dict.inbox.warning}
-          </p>
-        </div>
-      )}
 
       {isLoading ? (
         <div className="flex flex-col items-center justify-center py-16 text-center">

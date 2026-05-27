@@ -39,6 +39,14 @@
     "emptyInbox": "Sua caixa de entrada esta vazia. Novas mensagens aparecerao aqui automaticamente.",
     "enterEmailPrompt": "Digite um email acima e clique em 'Acessar Email' para verificar sua caixa de entrada."
   },
+  "sidebar": {
+    "title": "Emails Salvos",
+    "noSavedEmails": "Nenhum email salvo",
+    "addEmailPrompt": "Adicione emails usando o campo acima",
+    "remove": "Remover",
+    "online": "Online",
+    "recheck": "Verificar"
+  },
   "notifications": {
     "newEmailBrowser": "Novo email recebido!",
     "from": "De",
