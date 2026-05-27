@@ -514,7 +514,7 @@ export function EmailPage({ dict, lang }: EmailPageProps) {
           </div>
         </div>
 
-        {/* Center - Inbox (smaller) */}
+        {/* Center - Inbox */}
         <div className="flex-1 flex flex-col min-w-0 relative">
           {/* Expand left sidebar button */}
           {leftSidebarCollapsed && (
@@ -535,7 +535,7 @@ export function EmailPage({ dict, lang }: EmailPageProps) {
               <ChevronLeft className="h-4 w-4" />
             </button>
           )}
-          <div className="flex-1 p-4 max-w-2xl">
+          <div className="flex-1 p-4 w-full">
             {selectedEmail ? (
               <div className="h-full">
                 {/* Selected Email Header */}
@@ -615,7 +615,7 @@ export function EmailPage({ dict, lang }: EmailPageProps) {
 
           {/* Ads Section */}
           <div className="border-t border-border bg-muted/30 p-4">
-            <div className="mx-auto max-w-2xl">
+            <div className="w-full">
               <div className="rounded-lg border border-dashed border-border bg-background p-6 text-center">
                 <p className="text-xs text-muted-foreground">Espaco para Anuncios</p>
                 {/* Ad code will go here */}
