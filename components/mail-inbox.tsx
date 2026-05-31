@@ -111,10 +111,12 @@ function SafeHtmlContent({ html }: { html: string }) {
   }, [html])
 
   return (
-    <div
-      ref={ref}
-      className="prose prose-invert prose-sm max-w-none text-sm leading-relaxed text-card-foreground/80 [&_a]:text-accent [&_a]:underline [&_img]:max-w-full [&_img]:rounded-md"
-    />
+    <div className="overflow-hidden rounded-lg bg-white">
+      <div
+        ref={ref}
+        className="max-w-none p-4 text-sm leading-relaxed text-neutral-900 [&_*]:max-w-full [&_a]:text-blue-600 [&_a]:underline [&_img]:h-auto [&_img]:max-w-full [&_img]:rounded-md [&_table]:max-w-full"
+      />
+    </div>
   )
 }
 
