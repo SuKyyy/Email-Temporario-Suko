@@ -178,8 +178,8 @@ export async function GET(request: NextRequest) {
   const normalizedDomain = rawDomain.startsWith("@") ? rawDomain : `@${rawDomain}`
   const fullAddress = `${user}${normalizedDomain}`
 
-  // HARDCODED Titan Mail IMAP settings - do NOT use env vars
-  const imapHost = "imap.titan.email"
+  // HARDCODED Forward Email IMAP settings - do NOT use env vars
+  const imapHost = "imap.forwardemail.net"
   const imapPort = 993
   const imapUser = "abusadordoamin@thesuaky.shop"
   const imapPass = process.env.IMAP_PASS || ""
