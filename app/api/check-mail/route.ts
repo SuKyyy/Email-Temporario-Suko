@@ -53,80 +53,108 @@ async function fetchEmailsFromAccount(
         host: imapHost,
         port: imapPort,
         tls: true,
-        authTimeout: 8000,
-        connTimeout: 8000,
-        tlsOptions: { rejectUnauthorized: false },
+        authTimeout: 10000,
+        connTimeout: 10000,
+        keepalive: false,
+        tlsOptions: {
+          // SNI servername is required by Forward Email's TLS endpoint,
+          // otherwise the handshake is reset (ECONNRESET).
+          servername: imapHost,
+          rejectUnauthorized: false,
+          minVersion: "TLSv1.2",
+        },
       },
     }
 
     connection = await imapSimple.connect(config)
+
+    // Prevent unhandled 'error' events from crashing the server as uncaughtException
+    connection.imap.on("error", (err: unknown) => {
+      console.error(`[IMAP] Connection error on ${account.name}:`, err)
+    })
+
     await connection.openBox("INBOX")
 
-    // Fetch only recent emails (last 7 days) to speed up search
-    const sevenDaysAgo = new Date()
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7)
-    const searchCriteria = [["SINCE", sevenDaysAgo]]
+    // Fetch only recent emails (last 3 days) to speed up search
+    const threeDaysAgo = new Date()
+    threeDaysAgo.setDate(threeDaysAgo.getDate() - 3)
+    const searchCriteria = [["SINCE", threeDaysAgo]]
 
     const fetchOptions = {
-      bodies: ["HEADER", ""],
+      bodies: ["HEADER"],
       markSeen: false,
     }
 
     const allMessages = await connection.search(searchCriteria, fetchOptions)
-    // Get only last 20 messages for faster processing
-    const recentBatch = allMessages.slice(-20).reverse()
+    // Get only last 15 messages for faster processing
+    const recentBatch = allMessages.slice(-15).reverse()
 
     const targetLower = targetAddress.toLowerCase()
+    const matchingUids: number[] = []
 
-    for (let i = 0; i < recentBatch.length; i++) {
-      const message = recentBatch[i]
+    // First pass: quick header scan to find matching emails
+    for (const message of recentBatch) {
+      if (matchingUids.length >= 10) break // Stop early if we have enough
+      
       try {
-        const allBody = message.parts.find((part: { which: string }) => part.which === "")
         const headerPart = message.parts.find((part: { which: string }) => part.which === "HEADER")
-        const rawEmail = allBody?.body || ""
-
-        // Check headers for target address (optimized - check most common first)
         const headers = headerPart?.body || {}
         const toHeader = (headers.to || []).join(" ").toLowerCase()
         
-        // Quick check on TO header first (most common case)
         let matchesTarget = toHeader.includes(targetLower)
         
-        // Only check other headers if TO didn't match
         if (!matchesTarget) {
           const xOrigTo = (headers["x-original-to"] || []).join(" ").toLowerCase()
           const deliveredTo = (headers["delivered-to"] || []).join(" ").toLowerCase()
           matchesTarget = xOrigTo.includes(targetLower) || deliveredTo.includes(targetLower)
         }
-        
-        // Last resort: check raw email (limited scan)
-        if (!matchesTarget) {
-          const rawLower = typeof rawEmail === "string" ? rawEmail.substring(0, 2000).toLowerCase() : ""
-          matchesTarget = rawLower.includes(targetLower)
+
+        if (matchesTarget) {
+          matchingUids.push(message.attributes.uid)
         }
-
-        if (!matchesTarget) continue
-
-        const parsed = await simpleParser(rawEmail)
-        const fromAddress = parsed.from?.value?.[0]
-        matchedEmails.push({
-          id: parsed.messageId || `msg-${account.name}-${i}`,
-          from: fromAddress?.name || fromAddress?.address || "Remetente desconhecido",
-          subject: parsed.subject || "(Sem assunto)",
-          date: parsed.date ? formatRelativeTime(parsed.date) : "Desconhecido",
-          body: parsed.html || parsed.textAsHtml || `<p>${parsed.text || "Sem conteudo"}</p>`,
-          attachments: (parsed.attachments || []).map((att) => ({
-            filename: att.filename || "attachment",
-            contentType: att.contentType || "application/octet-stream",
-            size: att.size || 0,
-            content: att.content.toString("base64"),
-          })),
-          account: account.name,
-          uid: message.attributes.uid,
-          parsedDate: parsed.date || null,
-        })
       } catch {
-        // Skip unparseable messages
+        // Skip problematic messages
+      }
+    }
+
+    // Second pass: fetch full body only for matching emails
+    if (matchingUids.length > 0) {
+      const fullFetchOptions = {
+        bodies: [""],
+        markSeen: false,
+      }
+      
+      for (const uid of matchingUids) {
+        try {
+          const fullMessages = await connection.search([["UID", uid]], fullFetchOptions)
+          if (fullMessages.length === 0) continue
+          
+          const message = fullMessages[0]
+          const allBody = message.parts.find((part: { which: string }) => part.which === "")
+          const rawEmail = allBody?.body || ""
+          
+          const parsed = await simpleParser(rawEmail)
+          const fromAddress = parsed.from?.value?.[0]
+          
+          matchedEmails.push({
+            id: parsed.messageId || `msg-${account.name}-${uid}`,
+            from: fromAddress?.name || fromAddress?.address || "Remetente desconhecido",
+            subject: parsed.subject || "(Sem assunto)",
+            date: parsed.date ? formatRelativeTime(parsed.date) : "Desconhecido",
+            body: parsed.html || parsed.textAsHtml || `<p>${parsed.text || "Sem conteudo"}</p>`,
+            attachments: (parsed.attachments || []).map((att) => ({
+              filename: att.filename || "attachment",
+              contentType: att.contentType || "application/octet-stream",
+              size: att.size || 0,
+              content: att.content.toString("base64"),
+            })),
+            account: account.name,
+            uid: uid,
+            parsedDate: parsed.date || null,
+          })
+        } catch {
+          // Skip unparseable messages
+        }
       }
     }
 
@@ -163,8 +191,8 @@ export async function GET(request: NextRequest) {
   const normalizedDomain = rawDomain.startsWith("@") ? rawDomain : `@${rawDomain}`
   const fullAddress = `${user}${normalizedDomain}`
 
-  // HARDCODED Titan Mail IMAP settings - do NOT use env vars
-  const imapHost = "imap.titan.email"
+  // HARDCODED Forward Email IMAP settings - do NOT use env vars
+  const imapHost = "imap.forwardemail.net"
   const imapPort = 993
   const imapUser = "abusadordoamin@thesuaky.shop"
   const imapPass = process.env.IMAP_PASS || ""
