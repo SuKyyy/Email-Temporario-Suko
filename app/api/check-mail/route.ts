@@ -53,13 +53,26 @@ async function fetchEmailsFromAccount(
         host: imapHost,
         port: imapPort,
         tls: true,
-        authTimeout: 5000,
-        connTimeout: 5000,
-        tlsOptions: { rejectUnauthorized: false },
+        authTimeout: 10000,
+        connTimeout: 10000,
+        keepalive: false,
+        tlsOptions: {
+          // SNI servername is required by Forward Email's TLS endpoint,
+          // otherwise the handshake is reset (ECONNRESET).
+          servername: imapHost,
+          rejectUnauthorized: false,
+          minVersion: "TLSv1.2",
+        },
       },
     }
 
     connection = await imapSimple.connect(config)
+
+    // Prevent unhandled 'error' events from crashing the server as uncaughtException
+    connection.imap.on("error", (err: unknown) => {
+      console.error(`[IMAP] Connection error on ${account.name}:`, err)
+    })
+
     await connection.openBox("INBOX")
 
     // Fetch only recent emails (last 3 days) to speed up search
