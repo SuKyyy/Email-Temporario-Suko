@@ -33,7 +33,7 @@ function openInbox(connection) {
 function fetchHeadersBySeq(connection, range) {
   return new Promise((resolve, reject) => {
     const results = []
-    const fetch = connection.imap.seq.fetch(range, { bodies: "HEADER", struct: false })
+    const fetch = connection.imap.seq.fetch(range, { bodies: "HEADER.FIELDS (TO FROM SUBJECT DATE DELIVERED-TO X-ORIGINAL-TO)", struct: false })
     fetch.on("message", (msg) => {
       let uid = 0
       let headerText = ""
@@ -58,22 +58,24 @@ try {
   const r1 = await openInbox(connection)
   lap(`COLD openBox, total=${r1.total}`)
 
-  // Second open on SAME (now warm) connection
-  const r2 = await openInbox(connection)
-  lap(`WARM openBox, total=${r2.total}`)
+  const total = r1.total
 
-  const total = r2.total
-  if (total > 0) {
-    const start = Math.max(1, total - 39)
-    const range = `${start}:${total}`
-    lap(`fetching headers for seq range ${range}...`)
-    const headers = await fetchHeadersBySeq(connection, range)
-    lap(`header fetch done: ${headers.length} headers`)
-  }
+  // Fetch last 5 headers (small)
+  let start = Math.max(1, total - 4)
+  lap(`fetch last 5 headers ${start}:${total}...`)
+  const h1 = await fetchHeadersBySeq(connection, `${start}:${total}`)
+  lap(`  -> got ${h1.length} headers`)
 
-  // Third open to confirm warm speed again
-  await openInbox(connection)
-  lap("WARM openBox #2")
+  // Fetch last 5 AGAIN on warm connection
+  lap(`fetch last 5 headers again...`)
+  const h2 = await fetchHeadersBySeq(connection, `${start}:${total}`)
+  lap(`  -> got ${h2.length} headers`)
+
+  // Fetch last 50 headers
+  start = Math.max(1, total - 49)
+  lap(`fetch last 50 headers ${start}:${total}...`)
+  const h3 = await fetchHeadersBySeq(connection, `${start}:${total}`)
+  lap(`  -> got ${h3.length} headers`)
 
   connection.end()
   lap("done")
