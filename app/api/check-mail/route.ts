@@ -36,44 +36,6 @@ type ParsedEmail = {
   parsedDate: Date | null
 }
 
-// Open INBOX via the raw connection so we can read the total message count,
-// which lets us fetch by sequence number instead of doing a slow full-mailbox
-// SINCE search (critical when the mailbox has many messages).
-function openInbox(connection: Awaited<ReturnType<typeof imapSimple.connect>>): Promise<{ total: number }> {
-  return new Promise((resolve, reject) => {
-    connection.imap.openBox("INBOX", true, (err: Error | null, box: { messages?: { total?: number } }) => {
-      if (err) return reject(err)
-      resolve({ total: box?.messages?.total ?? 0 })
-    })
-  })
-}
-
-// Fetch only the HEADER for a sequence range (e.g. "980:1000"). This never scans
-// the whole mailbox; it grabs just the most recent N messages.
-function fetchHeadersBySeq(
-  connection: Awaited<ReturnType<typeof imapSimple.connect>>,
-  range: string
-): Promise<Array<{ uid: number; headerText: string }>> {
-  return new Promise((resolve, reject) => {
-    const results: Array<{ uid: number; headerText: string }> = []
-    const fetch = connection.imap.seq.fetch(range, { bodies: "HEADER", struct: false })
-
-    fetch.on("message", (msg: NodeJS.EventEmitter) => {
-      let uid = 0
-      let headerText = ""
-      msg.on("body", (stream: NodeJS.ReadableStream) => {
-        let buf = ""
-        stream.on("data", (chunk: Buffer) => (buf += chunk.toString("utf8")))
-        stream.on("end", () => (headerText = buf))
-      })
-      msg.once("attributes", (attrs: { uid: number }) => (uid = attrs.uid))
-      msg.once("end", () => results.push({ uid, headerText }))
-    })
-    fetch.once("error", reject)
-    fetch.once("end", () => resolve(results))
-  })
-}
-
 async function fetchEmailsFromAccount(
   account: ImapAccount,
   targetAddress: string,
@@ -111,76 +73,88 @@ async function fetchEmailsFromAccount(
       console.error(`[IMAP] Connection error on ${account.name}:`, err)
     })
 
-    // Open INBOX and read total message count (no full-mailbox scan).
-    const { total } = await openInbox(connection)
+    await connection.openBox("INBOX")
+
+    // Fetch only recent emails (last 3 days) to speed up search
+    const threeDaysAgo = new Date()
+    threeDaysAgo.setDate(threeDaysAgo.getDate() - 3)
+    const searchCriteria = [["SINCE", threeDaysAgo]]
+
+    const fetchOptions = {
+      bodies: ["HEADER"],
+      markSeen: false,
+    }
+
+    const allMessages = await connection.search(searchCriteria, fetchOptions)
+    // Get only last 15 messages for faster processing
+    const recentBatch = allMessages.slice(-15).reverse()
 
     const targetLower = targetAddress.toLowerCase()
     const matchingUids: number[] = []
 
-    if (total > 0) {
-      // Only look at the most recent 40 messages by sequence number.
-      const start = Math.max(1, total - 39)
-      const range = `${start}:${total}`
-
-      // First pass: fetch just the headers for that range and match by recipient.
-      const headerResults = await fetchHeadersBySeq(connection, range)
-
-      // Newest first
-      headerResults.reverse()
-
-      for (const { uid, headerText } of headerResults) {
-        if (matchingUids.length >= 10) break // Stop early once we have enough
-        if (headerText.toLowerCase().includes(targetLower)) {
-          matchingUids.push(uid)
+    // First pass: quick header scan to find matching emails
+    for (const message of recentBatch) {
+      if (matchingUids.length >= 10) break // Stop early if we have enough
+      
+      try {
+        const headerPart = message.parts.find((part: { which: string }) => part.which === "HEADER")
+        const headers = headerPart?.body || {}
+        const toHeader = (headers.to || []).join(" ").toLowerCase()
+        
+        let matchesTarget = toHeader.includes(targetLower)
+        
+        if (!matchesTarget) {
+          const xOrigTo = (headers["x-original-to"] || []).join(" ").toLowerCase()
+          const deliveredTo = (headers["delivered-to"] || []).join(" ").toLowerCase()
+          matchesTarget = xOrigTo.includes(targetLower) || deliveredTo.includes(targetLower)
         }
+
+        if (matchesTarget) {
+          matchingUids.push(message.attributes.uid)
+        }
+      } catch {
+        // Skip problematic messages
       }
     }
 
-    // Second pass: fetch full bodies for ALL matching emails in a SINGLE batch
-    // search (one round-trip) instead of one search per UID.
+    // Second pass: fetch full body only for matching emails
     if (matchingUids.length > 0) {
       const fullFetchOptions = {
         bodies: [""],
         markSeen: false,
       }
-
-      try {
-        const fullMessages = await connection.search(
-          [["UID", matchingUids.join(",")]],
-          fullFetchOptions
-        )
-
-        for (const message of fullMessages) {
-          try {
-            const uid = message.attributes.uid
-            const allBody = message.parts.find((part: { which: string }) => part.which === "")
-            const rawEmail = allBody?.body || ""
-
-            const parsed = await simpleParser(rawEmail)
-            const fromAddress = parsed.from?.value?.[0]
-
-            matchedEmails.push({
-              id: parsed.messageId || `msg-${account.name}-${uid}`,
-              from: fromAddress?.name || fromAddress?.address || "Remetente desconhecido",
-              subject: parsed.subject || "(Sem assunto)",
-              date: parsed.date ? formatRelativeTime(parsed.date) : "Desconhecido",
-              body: parsed.html || parsed.textAsHtml || `<p>${parsed.text || "Sem conteudo"}</p>`,
-              attachments: (parsed.attachments || []).map((att) => ({
-                filename: att.filename || "attachment",
-                contentType: att.contentType || "application/octet-stream",
-                size: att.size || 0,
-                content: att.content.toString("base64"),
-              })),
-              account: account.name,
-              uid: uid,
-              parsedDate: parsed.date || null,
-            })
-          } catch {
-            // Skip unparseable messages
-          }
+      
+      for (const uid of matchingUids) {
+        try {
+          const fullMessages = await connection.search([["UID", uid]], fullFetchOptions)
+          if (fullMessages.length === 0) continue
+          
+          const message = fullMessages[0]
+          const allBody = message.parts.find((part: { which: string }) => part.which === "")
+          const rawEmail = allBody?.body || ""
+          
+          const parsed = await simpleParser(rawEmail)
+          const fromAddress = parsed.from?.value?.[0]
+          
+          matchedEmails.push({
+            id: parsed.messageId || `msg-${account.name}-${uid}`,
+            from: fromAddress?.name || fromAddress?.address || "Remetente desconhecido",
+            subject: parsed.subject || "(Sem assunto)",
+            date: parsed.date ? formatRelativeTime(parsed.date) : "Desconhecido",
+            body: parsed.html || parsed.textAsHtml || `<p>${parsed.text || "Sem conteudo"}</p>`,
+            attachments: (parsed.attachments || []).map((att) => ({
+              filename: att.filename || "attachment",
+              contentType: att.contentType || "application/octet-stream",
+              size: att.size || 0,
+              content: att.content.toString("base64"),
+            })),
+            account: account.name,
+            uid: uid,
+            parsedDate: parsed.date || null,
+          })
+        } catch {
+          // Skip unparseable messages
         }
-      } catch {
-        // If the batch fetch fails, return whatever we have
       }
     }
 
@@ -236,18 +210,11 @@ export async function GET(request: NextRequest) {
     )
   }
 
-  // Hard timeout so a slow/hung IMAP server never makes the inbox spin forever.
-  const withTimeout = (promise: Promise<ParsedEmail[]>, ms: number): Promise<ParsedEmail[]> =>
-    Promise.race([
-      promise,
-      new Promise<ParsedEmail[]>((resolve) => setTimeout(() => resolve([]), ms)),
-    ])
-
   try {
-    // Fetch from all accounts simultaneously, each capped at 20s
+    // Fetch from both accounts simultaneously
     const results = await Promise.allSettled(
       accounts.map((account) =>
-        withTimeout(fetchEmailsFromAccount(account, fullAddress, imapHost, imapPort), 20000)
+        fetchEmailsFromAccount(account, fullAddress, imapHost, imapPort)
       )
     )
 
