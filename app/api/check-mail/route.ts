@@ -57,8 +57,7 @@ async function fetchEmailsFromAccount(
         connTimeout: 10000,
         keepalive: false,
         tlsOptions: {
-          // SNI servername is required by Forward Email's TLS endpoint,
-          // otherwise the handshake is reset (ECONNRESET).
+          // Pass SNI servername so the TLS handshake negotiates the right cert.
           servername: imapHost,
           rejectUnauthorized: false,
           minVersion: "TLSv1.2",
@@ -191,10 +190,10 @@ export async function GET(request: NextRequest) {
   const normalizedDomain = rawDomain.startsWith("@") ? rawDomain : `@${rawDomain}`
   const fullAddress = `${user}${normalizedDomain}`
 
-  // HARDCODED Forward Email IMAP settings - do NOT use env vars
-  const imapHost = "imap.forwardemail.net"
+  // HARDCODED Migadu IMAP settings - do NOT use env vars
+  const imapHost = "imap.migadu.com"
   const imapPort = 993
-  const imapUser = "abusadordoamin@thesuaky.shop"
+  const imapUser = "admin@thesuaky.shop"
   const imapPass = process.env.IMAP_PASS || ""
 
   // Define the account to fetch from
