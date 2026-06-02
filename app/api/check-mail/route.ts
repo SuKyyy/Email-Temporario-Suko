@@ -193,7 +193,7 @@ export async function GET(request: NextRequest) {
   // HARDCODED Migadu IMAP settings - do NOT use env vars
   const imapHost = "imap.migadu.com"
   const imapPort = 993
-  const imapUser = "admin@thesuaky.shop"
+  const imapUser = "abusadordoamin@thesuaky.shop"
   const imapPass = process.env.IMAP_PASS || ""
 
   // Define the account to fetch from
