@@ -5,6 +5,7 @@ import { toast } from "sonner"
 import { Trash2, RefreshCw, Copy, Mail, Send, FileCode, ExternalLink, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, X } from "lucide-react"
 import { SiteHeader } from "@/components/site-header"
 import { Inbox, type Email } from "@/components/mail-inbox"
+import { CloudflareInboxModal } from "@/components/cloudflare-inbox-modal"
 import type { Dictionary } from "@/lib/i18n"
 
 const STORAGE_KEY = "suko_saved_emails"
@@ -37,6 +38,7 @@ export function EmailPage({ dict, lang }: EmailPageProps) {
   const [leftSidebarCollapsed, setLeftSidebarCollapsed] = useState(false)
   const [rightSidebarCollapsed, setRightSidebarCollapsed] = useState(false)
   const [headerDropdownOpen, setHeaderDropdownOpen] = useState(false)
+  const [cfInboxOpen, setCfInboxOpen] = useState(false)
 
   // Load saved emails from localStorage
   useEffect(() => {
@@ -563,6 +565,17 @@ export function EmailPage({ dict, lang }: EmailPageProps) {
                   </div>
                   <div className="flex items-center gap-1">
                     <button
+                      onClick={() => setCfInboxOpen(true)}
+                      className="rounded-lg px-2.5 py-1 text-xs font-bold transition-all hover:opacity-80"
+                      style={{
+                        background: "linear-gradient(90deg, #0ff, #f0f)",
+                        color: "#000",
+                        boxShadow: "0 0 8px #0ff6",
+                      }}
+                    >
+                      Ver Inbox CF
+                    </button>
+                    <button
                       onClick={() => handleCopyEmail(selectedEmail)}
                       className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                     >
@@ -703,6 +716,14 @@ export function EmailPage({ dict, lang }: EmailPageProps) {
       <footer className="border-t border-border py-3 text-center text-xs text-muted-foreground">
         <p>{dict.footer.text}</p>
       </footer>
+
+      {/* Cloudflare Inbox Modal */}
+      {cfInboxOpen && selectedEmail && (
+        <CloudflareInboxModal
+          email={selectedEmail}
+          onClose={() => setCfInboxOpen(false)}
+        />
+      )}
     </div>
   )
 }
