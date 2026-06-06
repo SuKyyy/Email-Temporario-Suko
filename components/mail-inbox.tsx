@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useEffect } from "react"
+import { useState, useRef, useEffect, useMemo } from "react"
 import {
   ChevronDown,
   Clock,
@@ -80,46 +80,18 @@ function downloadAttachment(att: Attachment) {
 }
 
 function SafeHtmlContent({ html }: { html: string }) {
-  const iframeRef = useRef<HTMLIFrameElement>(null)
-  const [height, setHeight] = useState(400)
-  const blobUrl = useRef<string | null>(null)
-
   const isHtml = /<html|<body|<div|<table|<p\b/i.test(html)
 
-  useEffect(() => {
-    if (!isHtml) return
-    const iframe = iframeRef.current
-    if (!iframe) return
-
-    // Revoke previous blob URL
-    if (blobUrl.current) URL.revokeObjectURL(blobUrl.current)
-
-    // Strip only scripts and event handlers; keep all styles so email renders correctly
-    const stripped = html
+  const sanitized = useMemo(() => {
+    if (!isHtml) return ""
+    // Remove scripts and dangerous attributes; keep all styles intact
+    return html
       .replace(/<script[\s\S]*?<\/script>/gi, "")
-      .replace(/\son\w+="[^"]*"/gi, "")
-      .replace(/\son\w+='[^']*'/gi, "")
-      .replace(/href="javascript:[^"]*"/gi, 'href="#"')
-
-    const blob = new Blob([stripped], { type: "text/html; charset=utf-8" })
-    const url  = URL.createObjectURL(blob)
-    blobUrl.current = url
-    iframe.src = url
-
-    const onLoad = () => {
-      try {
-        const doc = iframe.contentDocument || iframe.contentWindow?.document
-        if (doc?.body) {
-          setHeight(Math.max(300, doc.body.scrollHeight + 40))
-        }
-      } catch { /* cross-origin guard */ }
-    }
-
-    iframe.addEventListener("load", onLoad)
-    return () => {
-      iframe.removeEventListener("load", onLoad)
-      URL.revokeObjectURL(url)
-    }
+      .replace(/<style[\s\S]*?<\/style>/gi, (match) => match) // keep styles
+      .replace(/\son\w+\s*=\s*["'][^"']*["']/gi, "")
+      .replace(/href\s*=\s*["']javascript:[^"']*["']/gi, 'href="#"')
+      // Extract only the body content if it's a full HTML doc
+      .replace(/^[\s\S]*<body[^>]*>([\s\S]*)<\/body>[\s\S]*$/i, "$1")
   }, [html, isHtml])
 
   if (!isHtml) {
@@ -133,13 +105,12 @@ function SafeHtmlContent({ html }: { html: string }) {
   }
 
   return (
-    <div className="overflow-hidden rounded-lg border border-border bg-white">
-      <iframe
-        ref={iframeRef}
-        style={{ width: "100%", height, border: "none", display: "block" }}
-        title="Email content"
-      />
-    </div>
+    <div
+      className="overflow-auto rounded-lg bg-white p-4 text-sm leading-relaxed text-neutral-900"
+      style={{ maxHeight: "600px" }}
+      // eslint-disable-next-line react/no-danger
+      dangerouslySetInnerHTML={{ __html: sanitized }}
+    />
   )
 }
 
