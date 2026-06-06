@@ -80,42 +80,64 @@ function downloadAttachment(att: Attachment) {
 }
 
 function SafeHtmlContent({ html }: { html: string }) {
-  const ref = useRef<HTMLDivElement>(null)
+  const iframeRef = useRef<HTMLIFrameElement>(null)
+  const [height, setHeight] = useState(200)
 
-  useEffect(() => {
-    if (!ref.current || typeof window === "undefined") return
-
+  // Strip scripts and dangerous attributes, keep everything else (styles, layout)
+  const sanitize = (raw: string) => {
     const parser = new DOMParser()
-    const doc = parser.parseFromString(html, "text/html")
-
-    doc
-      .querySelectorAll("script,iframe,object,embed,form,input,textarea")
-      .forEach((el) => el.remove())
-
+    const doc = parser.parseFromString(raw, "text/html")
+    doc.querySelectorAll("script,object,embed,form").forEach((el) => el.remove())
     doc.querySelectorAll("*").forEach((el) => {
       Array.from(el.attributes).forEach((attr) => {
-        if (
-          attr.name.startsWith("on") ||
-          attr.value.trim().toLowerCase().startsWith("javascript:")
-        ) {
+        if (attr.name.startsWith("on") || attr.value.trim().toLowerCase().startsWith("javascript:")) {
           el.removeAttribute(attr.name)
         }
       })
     })
-
     doc.querySelectorAll("a").forEach((link) => {
       link.setAttribute("target", "_blank")
       link.setAttribute("rel", "noopener noreferrer")
     })
+    return doc.documentElement.outerHTML
+  }
 
-    ref.current.innerHTML = doc.body.innerHTML
-  }, [html])
+  const isHtml = html.trimStart().startsWith("<")
+
+  useEffect(() => {
+    if (!isHtml) return
+    const iframe = iframeRef.current
+    if (!iframe) return
+    const safe = sanitize(html)
+    iframe.srcdoc = safe
+    const onLoad = () => {
+      try {
+        const body = iframe.contentDocument?.body
+        if (body) setHeight(Math.max(200, body.scrollHeight + 32))
+      } catch {}
+    }
+    iframe.addEventListener("load", onLoad)
+    return () => iframe.removeEventListener("load", onLoad)
+  }, [html, isHtml])
+
+  // Plain text (pre-wrapped)
+  if (!isHtml) {
+    return (
+      <div className="overflow-hidden rounded-lg bg-muted p-4">
+        <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed text-foreground">
+          {html}
+        </pre>
+      </div>
+    )
+  }
 
   return (
     <div className="overflow-hidden rounded-lg bg-white">
-      <div
-        ref={ref}
-        className="max-w-none p-4 text-sm leading-relaxed text-neutral-900 [&_*]:max-w-full [&_a]:text-blue-600 [&_a]:underline [&_img]:h-auto [&_img]:max-w-full [&_img]:rounded-md [&_table]:max-w-full"
+      <iframe
+        ref={iframeRef}
+        sandbox="allow-popups allow-popups-to-escape-sandbox"
+        style={{ width: "100%", height, border: "none", display: "block" }}
+        title="Email content"
       />
     </div>
   )
