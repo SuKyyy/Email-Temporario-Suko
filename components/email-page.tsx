@@ -115,15 +115,16 @@ export function EmailPage({ dict, lang }: EmailPageProps) {
         return body
       }
 
-      // Extract boundary from Content-Type header
-      const boundaryMatch = raw.match(/boundary="?([^"\r\n;]+)"?/i)
+      // Extract boundary — handles both quoted and unquoted values
+      const boundaryMatch = raw.match(/boundary=(?:"([^"]+)"|'([^']+)'|([^\s;>\r\n]+))/i)
       if (!boundaryMatch) {
         const { headers, body } = splitHeaders(raw)
         return decodeBody(body, headers).trim()
       }
 
-      const boundary = boundaryMatch[1].trim()
-      const parts    = raw.split(new RegExp(`--${boundary.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?:--)?`))
+      const boundary = (boundaryMatch[1] ?? boundaryMatch[2] ?? boundaryMatch[3]).trim()
+      const escaped  = boundary.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+      const parts    = raw.split(new RegExp(`--${escaped}(?:--)?`))
 
       // Collect all text/plain and text/html parts
       let htmlPart  = ""

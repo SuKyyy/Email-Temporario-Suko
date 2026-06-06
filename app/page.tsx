@@ -215,14 +215,15 @@ export default function Page() {
       return body
     }
 
-    const boundaryMatch = raw.match(/boundary="?([^"\r\n;]+)"?/i)
+    const boundaryMatch = raw.match(/boundary=(?:"([^"]+)"|'([^']+)'|([^\s;>\r\n]+))/i)
     if (!boundaryMatch) {
       const { headers, body } = splitHeaders(raw)
       return decodeBody(body, headers).trim()
     }
 
-    const boundary = boundaryMatch[1].trim()
-    const parts    = raw.split(new RegExp(`--${boundary.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?:--)?`))
+    const boundary = (boundaryMatch[1] ?? boundaryMatch[2] ?? boundaryMatch[3]).trim()
+    const escaped  = boundary.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+    const parts    = raw.split(new RegExp(`--${escaped}(?:--)?`))
 
     let htmlPart  = ""
     let plainPart = ""
