@@ -182,6 +182,13 @@ export default function Page() {
     requestNotificationPermission()
   }, [])
 
+  const extractBody = (raw: string): string => {
+    const crlfIdx = raw.indexOf("\r\n\r\n")
+    const lfIdx = raw.indexOf("\n\n")
+    const sep = crlfIdx !== -1 && (lfIdx === -1 || crlfIdx < lfIdx) ? crlfIdx + 4 : lfIdx !== -1 ? lfIdx + 2 : -1
+    return sep !== -1 ? raw.slice(sep).trim() : raw.trim()
+  }
+
   const fetchEmails = useCallback(async (fullAddress: string): Promise<Email[]> => {
     const res = await fetch(
       `${CF_INBOX_API}/${fullAddress}`,
@@ -190,16 +197,19 @@ export default function Page() {
     if (!res.ok) throw new Error(`Erro ao buscar emails (${res.status})`)
     const data = await res.json()
     return (Array.isArray(data) ? data : []).map(
-      (item: { from?: string; subject?: string; date?: string; text?: string }, i: number) => ({
-        id: `cf-${fullAddress}-${i}-${item.date ?? i}`,
-        from: item.from ?? "Desconhecido",
-        subject: item.subject ?? "(Sem assunto)",
-        date: item.date ?? "",
-        body: item.text
-          ? `<pre style="white-space:pre-wrap;font-family:inherit">${item.text}</pre>`
-          : "<p>(Sem conteúdo)</p>",
-        attachments: [],
-      })
+      (item: { from?: string; subject?: string; date?: string; text?: string }, i: number) => {
+        const bodyText = item.text ? extractBody(item.text) : ""
+        return {
+          id: `cf-${fullAddress}-${i}-${item.date ?? i}`,
+          from: item.from ?? "Desconhecido",
+          subject: item.subject ?? "(Sem assunto)",
+          date: item.date ?? "",
+          body: bodyText
+            ? `<pre style="white-space:pre-wrap;font-family:inherit">${bodyText}</pre>`
+            : "<p>(Sem conteúdo)</p>",
+          attachments: [],
+        }
+      }
     )
   }, [])
 

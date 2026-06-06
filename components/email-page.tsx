@@ -82,18 +82,29 @@ export function EmailPage({ dict, lang }: EmailPageProps) {
     const data = await res.json()
 
     // CF Worker returns array of { from, subject, date, text }
-    // Map to the Email interface expected by the Inbox component
+    // `text` is the raw email (headers + blank line + body). Strip the headers.
+    const extractBody = (raw: string): string => {
+      // Headers and body are separated by the first double newline (\r\n\r\n or \n\n)
+      const crlfIdx = raw.indexOf("\r\n\r\n")
+      const lfIdx = raw.indexOf("\n\n")
+      const sep = crlfIdx !== -1 && (lfIdx === -1 || crlfIdx < lfIdx) ? crlfIdx + 4 : lfIdx !== -1 ? lfIdx + 2 : -1
+      return sep !== -1 ? raw.slice(sep).trim() : raw.trim()
+    }
+
     const mapped: Email[] = (Array.isArray(data) ? data : []).map(
-      (item: { from?: string; subject?: string; date?: string; text?: string }, i: number) => ({
-        id: `cf-${fullAddress}-${i}-${item.date ?? i}`,
-        from: item.from ?? "Desconhecido",
-        subject: item.subject ?? "(Sem assunto)",
-        date: item.date ?? "",
-        body: item.text
-          ? `<pre style="white-space:pre-wrap;font-family:inherit">${item.text}</pre>`
-          : "<p>(Sem conteúdo)</p>",
-        attachments: [],
-      })
+      (item: { from?: string; subject?: string; date?: string; text?: string }, i: number) => {
+        const bodyText = item.text ? extractBody(item.text) : ""
+        return {
+          id: `cf-${fullAddress}-${i}-${item.date ?? i}`,
+          from: item.from ?? "Desconhecido",
+          subject: item.subject ?? "(Sem assunto)",
+          date: item.date ?? "",
+          body: bodyText
+            ? `<pre style="white-space:pre-wrap;font-family:inherit">${bodyText}</pre>`
+            : "<p>(Sem conteúdo)</p>",
+          attachments: [],
+        }
+      }
     )
 
     return dedupeEmails(mapped)
