@@ -184,7 +184,7 @@ export default function Page() {
 
   const fetchEmails = useCallback(async (fullAddress: string): Promise<Email[]> => {
     const res = await fetch(
-      `${CF_INBOX_API}/${encodeURIComponent(fullAddress)}`,
+      `${CF_INBOX_API}/${fullAddress}`,
       { cache: "no-store" }
     )
     if (!res.ok) throw new Error(`Erro ao buscar emails (${res.status})`)

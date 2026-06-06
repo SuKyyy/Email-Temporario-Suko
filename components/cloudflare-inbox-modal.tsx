@@ -3,7 +3,7 @@
 import { useState, useCallback } from "react"
 import { X, RefreshCw, Mail, Loader2 } from "lucide-react"
 
-const CF_API = "https://inbox-api.zukisukinho.workers.dev/inbox"
+const CF_API = "https://inbox-api.izukisukinho.workers.dev/inbox"
 
 interface CfEmail {
   from: string
@@ -26,7 +26,7 @@ export function CloudflareInboxModal({ email, onClose }: Props) {
     setLoading(true)
     setError(null)
     try {
-      const res = await fetch(`${CF_API}/${encodeURIComponent(email)}`)
+      const res = await fetch(`${CF_API}/${email}`, { cache: "no-store" })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const data = await res.json()
       setEmails(Array.isArray(data) ? data : [])
