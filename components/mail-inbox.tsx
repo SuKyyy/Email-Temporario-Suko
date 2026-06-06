@@ -111,29 +111,6 @@ function SafeHtmlContent({ html }: { html: string }) {
     ref.current.innerHTML = doc.body.innerHTML
   }, [html])
 
-  // If the body is a raw <pre> (plain text from CF Worker), render cyberpunk style
-  const isPlainText = html.trimStart().startsWith("<pre")
-
-  if (isPlainText) {
-    const text = html.replace(/<pre[^>]*>|<\/pre>/g, "")
-    return (
-      <div className="overflow-hidden rounded-lg border border-[#0ff3] bg-[#0a0a0a] p-4">
-        <pre
-          style={{
-            whiteSpace: "pre-wrap",
-            fontFamily: "monospace",
-            fontSize: "0.8rem",
-            lineHeight: "1.6",
-            color: "#00ff9d",
-            textShadow: "0 0 6px #00ff9d88",
-          }}
-        >
-          {text}
-        </pre>
-      </div>
-    )
-  }
-
   return (
     <div className="overflow-hidden rounded-lg bg-white">
       <div

@@ -204,9 +204,7 @@ export default function Page() {
           from: item.from ?? "Desconhecido",
           subject: item.subject ?? "(Sem assunto)",
           date: item.date ?? "",
-          body: bodyText
-            ? `<pre style="white-space:pre-wrap;font-family:inherit">${bodyText}</pre>`
-            : "<p>(Sem conteúdo)</p>",
+          body: bodyText || "<p>(Sem conteúdo)</p>",
           attachments: [],
         }
       }
