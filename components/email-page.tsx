@@ -81,33 +81,77 @@ export function EmailPage({ dict, lang }: EmailPageProps) {
 
     const data = await res.json()
 
-    // CF Worker returns array of { from, subject, date, text }
-    // `text` is the raw email (headers + blank line + body). Strip the headers,
-    // decode quoted-printable, and return the clean body.
-    const decodeQP = (s: string): string =>
-      s
-        .replace(/=\r?\n/g, "")
-        .replace(/=([0-9A-Fa-f]{2})/g, (_, h) => {
+    // Full MIME parser: handles multipart, base64, quoted-printable
+    const parseMime = (raw: string): string => {
+      const splitHeaders = (block: string) => {
+        const sepCrlf = block.indexOf("\r\n\r\n")
+        const sepLf   = block.indexOf("\n\n")
+        const sep =
+          sepCrlf !== -1 && (sepLf === -1 || sepCrlf < sepLf)
+            ? sepCrlf + 4
+            : sepLf !== -1 ? sepLf + 2 : -1
+        return {
+          headers: sep !== -1 ? block.slice(0, sep).toLowerCase() : "",
+          body:    sep !== -1 ? block.slice(sep) : block,
+        }
+      }
+
+      const decodeQP = (s: string) =>
+        s.replace(/=\r?\n/g, "").replace(/=([0-9A-Fa-f]{2})/g, (_, h) => {
           try { return decodeURIComponent("%" + h) } catch { return "" }
         })
 
-    const extractBody = (raw: string): string => {
-      const crlfIdx = raw.indexOf("\r\n\r\n")
-      const lfIdx   = raw.indexOf("\n\n")
-      const sep =
-        crlfIdx !== -1 && (lfIdx === -1 || crlfIdx < lfIdx)
-          ? crlfIdx + 4
-          : lfIdx !== -1 ? lfIdx + 2 : -1
+      const decodeB64 = (s: string) => {
+        try {
+          const bin = atob(s.replace(/\s/g, ""))
+          const bytes = Uint8Array.from(bin, c => c.charCodeAt(0))
+          return new TextDecoder("utf-8").decode(bytes)
+        } catch { return s }
+      }
 
-      const headerBlock = sep !== -1 ? raw.slice(0, sep).toLowerCase() : ""
-      const isQP = headerBlock.includes("quoted-printable")
-      const body = sep !== -1 ? raw.slice(sep).trim() : raw.trim()
-      return isQP ? decodeQP(body) : body
+      const decodeBody = (body: string, headers: string) => {
+        if (headers.includes("base64"))        return decodeB64(body)
+        if (headers.includes("quoted-printable")) return decodeQP(body)
+        return body
+      }
+
+      // Extract boundary from Content-Type header
+      const boundaryMatch = raw.match(/boundary="?([^"\r\n;]+)"?/i)
+      if (!boundaryMatch) {
+        const { headers, body } = splitHeaders(raw)
+        return decodeBody(body, headers).trim()
+      }
+
+      const boundary = boundaryMatch[1].trim()
+      const parts    = raw.split(new RegExp(`--${boundary.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?:--)?`))
+
+      // Collect all text/plain and text/html parts
+      let htmlPart  = ""
+      let plainPart = ""
+
+      for (const part of parts) {
+        if (!part.trim() || part.trim() === "--") continue
+        const { headers, body } = splitHeaders(part)
+        // Recurse into nested multipart
+        if (headers.includes("multipart/")) {
+          const nested = parseMime(part.trim())
+          if (nested) htmlPart = htmlPart || nested
+          continue
+        }
+        const decoded = decodeBody(body, headers).trim()
+        if (headers.includes("text/html")  && !htmlPart)  htmlPart  = decoded
+        if (headers.includes("text/plain") && !plainPart) plainPart = decoded
+      }
+
+      // Prefer HTML; fall back to plain text wrapped in <pre>
+      if (htmlPart)  return htmlPart
+      if (plainPart) return `<pre style="white-space:pre-wrap;font-family:inherit">${plainPart}</pre>`
+      return ""
     }
 
     const mapped: Email[] = (Array.isArray(data) ? data : []).map(
       (item: { from?: string; subject?: string; date?: string; text?: string }, i: number) => {
-        const bodyText = item.text ? extractBody(item.text) : ""
+        const bodyText = item.text ? parseMime(item.text) : ""
         return {
           id: `cf-${fullAddress}-${i}-${item.date ?? i}`,
           from: item.from ?? "Desconhecido",
