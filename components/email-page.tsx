@@ -5,7 +5,6 @@ import { toast } from "sonner"
 import { Trash2, RefreshCw, Copy, Mail, Send, FileCode, ExternalLink, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, X } from "lucide-react"
 import { SiteHeader } from "@/components/site-header"
 import { Inbox, type Email } from "@/components/mail-inbox"
-import { CloudflareInboxModal } from "@/components/cloudflare-inbox-modal"
 import type { Dictionary } from "@/lib/i18n"
 
 const STORAGE_KEY = "suko_saved_emails"
@@ -38,7 +37,6 @@ export function EmailPage({ dict, lang }: EmailPageProps) {
   const [leftSidebarCollapsed, setLeftSidebarCollapsed] = useState(false)
   const [rightSidebarCollapsed, setRightSidebarCollapsed] = useState(false)
   const [headerDropdownOpen, setHeaderDropdownOpen] = useState(false)
-  const [cfInboxOpen, setCfInboxOpen] = useState(false)
 
   // Load saved emails from localStorage
   useEffect(() => {
@@ -72,21 +70,34 @@ export function EmailPage({ dict, lang }: EmailPageProps) {
   }, [])
 
   const fetchEmails = useCallback(async (fullAddress: string) => {
-    const atIndex = fullAddress.lastIndexOf("@")
-    if (atIndex === -1) throw new Error(dict.errors.invalidFormat)
-    
-    const user = fullAddress.slice(0, atIndex)
-    const domain = fullAddress.slice(atIndex)
-
     const res = await fetch(
-      `/api/check-mail?user=${encodeURIComponent(user)}&domain=${encodeURIComponent(domain)}`
+      `https://inbox-api.zukisukinho.workers.dev/inbox/${encodeURIComponent(fullAddress)}`,
+      { cache: "no-store" }
     )
-    const data = await res.json()
+
     if (!res.ok) {
-      throw new Error(data.error || dict.errors.fetchError)
+      throw new Error(`Erro ao buscar emails (${res.status})`)
     }
-    return dedupeEmails(data.emails as Email[])
-  }, [dict.errors.invalidFormat, dict.errors.fetchError, dedupeEmails])
+
+    const data = await res.json()
+
+    // CF Worker returns array of { from, subject, date, text }
+    // Map to the Email interface expected by the Inbox component
+    const mapped: Email[] = (Array.isArray(data) ? data : []).map(
+      (item: { from?: string; subject?: string; date?: string; text?: string }, i: number) => ({
+        id: `cf-${fullAddress}-${i}-${item.date ?? i}`,
+        from: item.from ?? "Desconhecido",
+        subject: item.subject ?? "(Sem assunto)",
+        date: item.date ?? "",
+        body: item.text
+          ? `<pre style="white-space:pre-wrap;font-family:inherit">${item.text}</pre>`
+          : "<p>(Sem conteúdo)</p>",
+        attachments: [],
+      })
+    )
+
+    return dedupeEmails(mapped)
+  }, [dedupeEmails])
 
   const handleAddEmail = useCallback(async () => {
     const trimmed = inputEmail.trim().toLowerCase()
@@ -565,17 +576,6 @@ export function EmailPage({ dict, lang }: EmailPageProps) {
                   </div>
                   <div className="flex items-center gap-1">
                     <button
-                      onClick={() => setCfInboxOpen(true)}
-                      className="rounded-lg px-2.5 py-1 text-xs font-bold transition-all hover:opacity-80"
-                      style={{
-                        background: "linear-gradient(90deg, #0ff, #f0f)",
-                        color: "#000",
-                        boxShadow: "0 0 8px #0ff6",
-                      }}
-                    >
-                      Ver Inbox CF
-                    </button>
-                    <button
                       onClick={() => handleCopyEmail(selectedEmail)}
                       className="rounded-lg p-1.5 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                     >
@@ -717,13 +717,6 @@ export function EmailPage({ dict, lang }: EmailPageProps) {
         <p>{dict.footer.text}</p>
       </footer>
 
-      {/* Cloudflare Inbox Modal */}
-      {cfInboxOpen && selectedEmail && (
-        <CloudflareInboxModal
-          email={selectedEmail}
-          onClose={() => setCfInboxOpen(false)}
-        />
-      )}
     </div>
   )
 }
