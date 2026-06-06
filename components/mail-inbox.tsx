@@ -43,6 +43,7 @@ interface InboxProps {
   isPolling: boolean
   statusMessage: string | null
   countdown: number
+  fetchError: string | null
   onRefresh: () => void
   dict: Dictionary
 }
@@ -110,6 +111,29 @@ function SafeHtmlContent({ html }: { html: string }) {
     ref.current.innerHTML = doc.body.innerHTML
   }, [html])
 
+  // If the body is a raw <pre> (plain text from CF Worker), render cyberpunk style
+  const isPlainText = html.trimStart().startsWith("<pre")
+
+  if (isPlainText) {
+    const text = html.replace(/<pre[^>]*>|<\/pre>/g, "")
+    return (
+      <div className="overflow-hidden rounded-lg border border-[#0ff3] bg-[#0a0a0a] p-4">
+        <pre
+          style={{
+            whiteSpace: "pre-wrap",
+            fontFamily: "monospace",
+            fontSize: "0.8rem",
+            lineHeight: "1.6",
+            color: "#00ff9d",
+            textShadow: "0 0 6px #00ff9d88",
+          }}
+        >
+          {text}
+        </pre>
+      </div>
+    )
+  }
+
   return (
     <div className="overflow-hidden rounded-lg bg-white">
       <div
@@ -158,20 +182,47 @@ function AttachmentList({ attachments, dict }: { attachments: Attachment[]; dict
   )
 }
 
-function EmptyState({ hasSearched, dict }: { hasSearched: boolean; dict: Dictionary }) {
+function EmptyState({ hasSearched }: { hasSearched: boolean }) {
   return (
     <div className="flex flex-col items-center justify-center py-16 text-center">
-      <div className="mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-secondary">
-        <Mail className="h-10 w-10 text-muted-foreground" />
+      <div
+        className="mb-4 flex h-20 w-20 items-center justify-center rounded-full"
+        style={{ background: "#0ff1", boxShadow: "0 0 20px #0ff3" }}
+      >
+        <Mail className="h-10 w-10" style={{ color: "#0ff", filter: "drop-shadow(0 0 6px #0ff)" }} />
       </div>
-      <h3 className="mb-1 text-lg font-semibold text-card-foreground">
-        {hasSearched ? dict.inbox.noEmailsFound : dict.inbox.noEmailSelected}
+      <h3 className="mb-2 text-base font-bold" style={{ color: "#0ff" }}>
+        {hasSearched ? "Nenhum email ainda" : "Nenhum email selecionado"}
       </h3>
       <p className="max-w-xs text-sm text-muted-foreground">
         {hasSearched
-          ? dict.inbox.emptyInbox
-          : dict.inbox.enterEmailPrompt}
+          ? "Manda um email de teste pro endereco acima e clique em Atualizar."
+          : "Digite um email e clique em Acessar Email para ver a inbox."}
       </p>
+    </div>
+  )
+}
+
+function ErrorState({ message, onRetry }: { message: string; onRetry: () => void }) {
+  return (
+    <div className="flex flex-col items-center justify-center py-16 text-center">
+      <div
+        className="mb-4 flex h-20 w-20 items-center justify-center rounded-full"
+        style={{ background: "#f0f1", boxShadow: "0 0 20px #f0f3" }}
+      >
+        <Mail className="h-10 w-10" style={{ color: "#f0f", filter: "drop-shadow(0 0 6px #f0f)" }} />
+      </div>
+      <h3 className="mb-2 text-base font-bold" style={{ color: "#f0f" }}>
+        Erro ao carregar emails
+      </h3>
+      <p className="mb-4 max-w-xs text-sm text-muted-foreground">{message}</p>
+      <button
+        onClick={onRetry}
+        className="rounded-md border px-4 py-1.5 text-xs font-semibold transition-colors hover:opacity-80"
+        style={{ borderColor: "#f0f", color: "#f0f", boxShadow: "0 0 8px #f0f4" }}
+      >
+        Tentar novamente
+      </button>
     </div>
   )
 }
@@ -230,45 +281,56 @@ export function Inbox({
   hasSearched,
   isLoading,
   isRefreshing,
-  isPolling,
   statusMessage,
-  countdown,
+  fetchError,
   onRefresh,
   dict,
 }: InboxProps) {
   return (
-    <div className="overflow-hidden rounded-xl border border-border bg-card shadow-lg">
-      <div className="flex items-center gap-3 border-b border-border px-5 py-3">
-        <h3 className="text-sm font-semibold text-card-foreground">
+    <div
+      className="overflow-hidden rounded-xl bg-card shadow-lg"
+      style={{ border: "1px solid #0ff4", boxShadow: "0 0 18px #0ff1" }}
+    >
+      {/* Header */}
+      <div
+        className="flex items-center gap-3 px-5 py-3"
+        style={{ borderBottom: "1px solid #0ff3" }}
+      >
+        <h3
+          className="text-sm font-bold tracking-wide"
+          style={{ color: "#0ff", textShadow: "0 0 8px #0ff8" }}
+        >
           {dict.inbox.title}
         </h3>
         {activeEmail && activeDomain && (
-          <span className="rounded-full bg-secondary px-3 py-0.5 font-mono text-xs text-muted-foreground">
-            {activeEmail}
-            {activeDomain}
+          <span
+            className="rounded-full px-3 py-0.5 font-mono text-xs"
+            style={{ background: "#0ff1", color: "#0ff", border: "1px solid #0ff4" }}
+          >
+            {activeEmail}{activeDomain}
           </span>
         )}
         {emails.length > 0 && (
-          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-accent text-xs font-bold text-accent-foreground">
+          <span
+            className="flex h-5 w-5 items-center justify-center rounded-full text-xs font-bold"
+            style={{ background: "#0ff", color: "#000" }}
+          >
             {emails.length}
           </span>
         )}
         {activeEmail && (
           <div className="ml-auto flex items-center gap-3">
             {statusMessage && (
-              <span className="text-xs text-muted-foreground">
-                {statusMessage}
-              </span>
+              <span className="text-xs text-muted-foreground">{statusMessage}</span>
             )}
             <button
               onClick={onRefresh}
               disabled={isRefreshing}
-              className="flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1 text-xs text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+              className="flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-semibold transition-all disabled:cursor-not-allowed disabled:opacity-50 hover:opacity-80"
+              style={{ border: "1px solid #0ff6", color: "#0ff", boxShadow: "0 0 6px #0ff3" }}
               aria-label={dict.inbox.refreshAriaLabel}
             >
-              <RefreshCw
-                className={`h-3.5 w-3.5 ${isRefreshing ? "animate-spin" : ""}`}
-              />
+              <RefreshCw className={`h-3.5 w-3.5 ${isRefreshing ? "animate-spin" : ""}`} />
               <span className="hidden sm:inline">
                 {isRefreshing ? dict.inbox.refreshing : dict.inbox.refresh}
               </span>
@@ -277,15 +339,21 @@ export function Inbox({
         )}
       </div>
 
+      {/* Body */}
       {isLoading ? (
         <div className="flex flex-col items-center justify-center py-16 text-center">
-          <Loader2 className="mb-4 h-10 w-10 animate-spin text-muted-foreground" />
-          <p className="text-sm text-muted-foreground">{dict.inbox.searching}</p>
+          <Loader2
+            className="mb-4 h-10 w-10 animate-spin"
+            style={{ color: "#0ff", filter: "drop-shadow(0 0 6px #0ff)" }}
+          />
+          <p className="text-sm" style={{ color: "#0ff9" }}>{dict.inbox.searching}</p>
         </div>
+      ) : fetchError ? (
+        <ErrorState message={fetchError} onRetry={onRefresh} />
       ) : emails.length === 0 ? (
-        <EmptyState hasSearched={hasSearched} dict={dict} />
+        <EmptyState hasSearched={hasSearched} />
       ) : (
-        <div className="divide-y divide-border">
+        <div className="divide-y" style={{ borderColor: "#0ff2" }}>
           {emails.map((email, index) => (
             <EmailItem key={`${email.id}-${index}`} email={email} dict={dict} />
           ))}

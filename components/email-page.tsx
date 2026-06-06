@@ -605,8 +605,9 @@ export function EmailPage({ dict, lang }: EmailPageProps) {
                   isLoading={loading}
                   isRefreshing={refreshing}
                   isPolling={false}
-                  statusMessage={null}
+                  statusMessage={statusMessage}
                   countdown={0}
+                  fetchError={error}
                   onRefresh={handleRefresh}
                   dict={dict}
                 />
