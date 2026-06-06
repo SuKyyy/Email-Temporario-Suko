@@ -86,10 +86,10 @@ export function EmailPage({ dict, lang }: EmailPageProps) {
     // decode quoted-printable, and return the clean body.
     const decodeQP = (s: string): string =>
       s
-        .replace(/=\r?\n/g, "")                          // soft line breaks
-        .replace(/=([0-9A-Fa-f]{2})/g, (_, h) =>        // encoded bytes
-          decodeURIComponent("%" + h)
-        )
+        .replace(/=\r?\n/g, "")
+        .replace(/=([0-9A-Fa-f]{2})/g, (_, h) => {
+          try { return decodeURIComponent("%" + h) } catch { return "" }
+        })
 
     const extractBody = (raw: string): string => {
       const crlfIdx = raw.indexOf("\r\n\r\n")

@@ -185,7 +185,9 @@ export default function Page() {
   const decodeQP = (s: string): string =>
     s
       .replace(/=\r?\n/g, "")
-      .replace(/=([0-9A-Fa-f]{2})/g, (_, h) => decodeURIComponent("%" + h))
+      .replace(/=([0-9A-Fa-f]{2})/g, (_, h) => {
+        try { return decodeURIComponent("%" + h) } catch { return "" }
+      })
 
   const extractBody = (raw: string): string => {
     const crlfIdx = raw.indexOf("\r\n\r\n")
