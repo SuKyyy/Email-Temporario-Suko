@@ -81,46 +81,47 @@ function downloadAttachment(att: Attachment) {
 
 function SafeHtmlContent({ html }: { html: string }) {
   const iframeRef = useRef<HTMLIFrameElement>(null)
-  const [height, setHeight] = useState(200)
+  const [height, setHeight] = useState(400)
+  const blobUrl = useRef<string | null>(null)
 
-  // Strip scripts and dangerous attributes, keep everything else (styles, layout)
-  const sanitize = (raw: string) => {
-    const parser = new DOMParser()
-    const doc = parser.parseFromString(raw, "text/html")
-    doc.querySelectorAll("script,object,embed,form").forEach((el) => el.remove())
-    doc.querySelectorAll("*").forEach((el) => {
-      Array.from(el.attributes).forEach((attr) => {
-        if (attr.name.startsWith("on") || attr.value.trim().toLowerCase().startsWith("javascript:")) {
-          el.removeAttribute(attr.name)
-        }
-      })
-    })
-    doc.querySelectorAll("a").forEach((link) => {
-      link.setAttribute("target", "_blank")
-      link.setAttribute("rel", "noopener noreferrer")
-    })
-    return doc.documentElement.outerHTML
-  }
-
-  const isHtml = html.trimStart().startsWith("<")
+  const isHtml = /<html|<body|<div|<table|<p\b/i.test(html)
 
   useEffect(() => {
     if (!isHtml) return
     const iframe = iframeRef.current
     if (!iframe) return
-    const safe = sanitize(html)
-    iframe.srcdoc = safe
+
+    // Revoke previous blob URL
+    if (blobUrl.current) URL.revokeObjectURL(blobUrl.current)
+
+    // Strip only scripts and event handlers; keep all styles so email renders correctly
+    const stripped = html
+      .replace(/<script[\s\S]*?<\/script>/gi, "")
+      .replace(/\son\w+="[^"]*"/gi, "")
+      .replace(/\son\w+='[^']*'/gi, "")
+      .replace(/href="javascript:[^"]*"/gi, 'href="#"')
+
+    const blob = new Blob([stripped], { type: "text/html; charset=utf-8" })
+    const url  = URL.createObjectURL(blob)
+    blobUrl.current = url
+    iframe.src = url
+
     const onLoad = () => {
       try {
-        const body = iframe.contentDocument?.body
-        if (body) setHeight(Math.max(200, body.scrollHeight + 32))
-      } catch {}
+        const doc = iframe.contentDocument || iframe.contentWindow?.document
+        if (doc?.body) {
+          setHeight(Math.max(300, doc.body.scrollHeight + 40))
+        }
+      } catch { /* cross-origin guard */ }
     }
+
     iframe.addEventListener("load", onLoad)
-    return () => iframe.removeEventListener("load", onLoad)
+    return () => {
+      iframe.removeEventListener("load", onLoad)
+      URL.revokeObjectURL(url)
+    }
   }, [html, isHtml])
 
-  // Plain text (pre-wrapped)
   if (!isHtml) {
     return (
       <div className="overflow-hidden rounded-lg bg-muted p-4">
@@ -132,10 +133,9 @@ function SafeHtmlContent({ html }: { html: string }) {
   }
 
   return (
-    <div className="overflow-hidden rounded-lg bg-white">
+    <div className="overflow-hidden rounded-lg border border-border bg-white">
       <iframe
         ref={iframeRef}
-        sandbox="allow-popups allow-popups-to-escape-sandbox"
         style={{ width: "100%", height, border: "none", display: "block" }}
         title="Email content"
       />
