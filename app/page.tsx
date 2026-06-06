@@ -182,18 +182,20 @@ export default function Page() {
     requestNotificationPermission()
   }, [])
 
-  const parseMime = (raw: string): string => {
+  const parseMime = (rawInput: string): string => {
+    // Normalize ALL line endings to \n up front, once — critical for browser vs Node consistency
+    const raw = rawInput.replace(/\r\n/g, "\n").replace(/\r/g, "\n")
+
     function splitPart(block: string) {
-      const norm = block.replace(/\r\n/g, "\n")
-      const idx  = norm.indexOf("\n\n")
-      if (idx === -1) return { headers: norm.toLowerCase(), body: "" }
-      return { headers: norm.slice(0, idx).toLowerCase(), body: norm.slice(idx + 2) }
+      const idx = block.indexOf("\n\n")
+      if (idx === -1) return { headers: block.toLowerCase(), body: "" }
+      return { headers: block.slice(0, idx).toLowerCase(), body: block.slice(idx + 2) }
     }
 
     function getBoundary(headers: string) {
       const m = headers.match(/boundary=(?:"([^"]+)"|'([^']+)'|([^\s;>\n]+))/i)
       if (!m) return null
-      return (m[1] ?? m[2] ?? m[3]).replace(/^"|"$/g, "").trim()
+      return (m[1] ?? m[2] ?? m[3]).replace(/^["']|["']$/g, "").trim()
     }
 
     function decodeB64(s: string) {
@@ -224,7 +226,7 @@ export default function Page() {
 
       if (boundary) {
         const esc   = boundary.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
-        const parts = body.split(new RegExp(`\n?--${esc}(?:--)?\\n?`))
+        const parts = body.split(new RegExp(`--${esc}(?:--)?`))
         let html = "", plain = ""
         for (const part of parts) {
           const t = part.trim()

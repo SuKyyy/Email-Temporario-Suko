@@ -82,18 +82,20 @@ export function EmailPage({ dict, lang }: EmailPageProps) {
     const data = await res.json()
 
     // MIME parser: recursively extracts text/html or text/plain from any MIME structure
-    const parseMime = (raw: string): string => {
+    const parseMime = (rawInput: string): string => {
+      // Normalize ALL line endings to \n up front, once
+      const raw = rawInput.replace(/\r\n/g, "\n").replace(/\r/g, "\n")
+
       function splitPart(block: string) {
-        const norm = block.replace(/\r\n/g, "\n")
-        const idx  = norm.indexOf("\n\n")
-        if (idx === -1) return { headers: norm.toLowerCase(), body: "" }
-        return { headers: norm.slice(0, idx).toLowerCase(), body: norm.slice(idx + 2) }
+        const idx = block.indexOf("\n\n")
+        if (idx === -1) return { headers: block.toLowerCase(), body: "" }
+        return { headers: block.slice(0, idx).toLowerCase(), body: block.slice(idx + 2) }
       }
 
       function getBoundary(headers: string) {
         const m = headers.match(/boundary=(?:"([^"]+)"|'([^']+)'|([^\s;>\n]+))/i)
         if (!m) return null
-        return (m[1] ?? m[2] ?? m[3]).replace(/^"|"$/g, "").trim()
+        return (m[1] ?? m[2] ?? m[3]).replace(/^["']|["']$/g, "").trim()
       }
 
       function decodeB64(s: string) {
@@ -113,8 +115,8 @@ export function EmailPage({ dict, lang }: EmailPageProps) {
       }
 
       function decodePart(body: string, headers: string) {
-        if (headers.includes("base64"))             return decodeB64(body)
-        if (headers.includes("quoted-printable"))   return decodeQP(body)
+        if (headers.includes("base64"))           return decodeB64(body)
+        if (headers.includes("quoted-printable")) return decodeQP(body)
         return body
       }
 
@@ -123,9 +125,12 @@ export function EmailPage({ dict, lang }: EmailPageProps) {
         const { headers, body } = splitPart(block)
         const boundary = getBoundary(headers)
 
+        console.log("[v0] extract | boundary:", boundary, "| headers snippet:", headers.slice(0, 80))
+
         if (boundary) {
           const esc   = boundary.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
-          const parts = body.split(new RegExp(`\n?--${esc}(?:--)?\\n?`))
+          const parts = body.split(new RegExp(`--${esc}(?:--)?`))
+          console.log("[v0] split into", parts.length, "parts for boundary:", boundary)
           let html = "", plain = ""
           for (const part of parts) {
             const t = part.trim()
@@ -139,12 +144,14 @@ export function EmailPage({ dict, lang }: EmailPageProps) {
 
         // Leaf node
         const decoded = decodePart(body, headers).trim()
+        console.log("[v0] leaf | isHtml:", headers.includes("text/html"), "| isPlain:", headers.includes("text/plain"), "| decoded len:", decoded.length)
         if (headers.includes("text/html"))  return { html: decoded, plain: "" }
         if (headers.includes("text/plain")) return { html: "", plain: decoded }
         return { html: "", plain: "" }
       }
 
       const { html, plain } = extract(raw)
+      console.log("[v0] parseMime result | html len:", html.length, "| plain len:", plain.length)
       if (html)  return html
       if (plain) return `<pre style="white-space:pre-wrap;font-family:inherit">${plain}</pre>`
       return ""
