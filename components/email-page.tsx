@@ -82,13 +82,27 @@ export function EmailPage({ dict, lang }: EmailPageProps) {
     const data = await res.json()
 
     // CF Worker returns array of { from, subject, date, text }
-    // `text` is the raw email (headers + blank line + body). Strip the headers.
+    // `text` is the raw email (headers + blank line + body). Strip the headers,
+    // decode quoted-printable, and return the clean body.
+    const decodeQP = (s: string): string =>
+      s
+        .replace(/=\r?\n/g, "")                          // soft line breaks
+        .replace(/=([0-9A-Fa-f]{2})/g, (_, h) =>        // encoded bytes
+          decodeURIComponent("%" + h)
+        )
+
     const extractBody = (raw: string): string => {
-      // Headers and body are separated by the first double newline (\r\n\r\n or \n\n)
       const crlfIdx = raw.indexOf("\r\n\r\n")
-      const lfIdx = raw.indexOf("\n\n")
-      const sep = crlfIdx !== -1 && (lfIdx === -1 || crlfIdx < lfIdx) ? crlfIdx + 4 : lfIdx !== -1 ? lfIdx + 2 : -1
-      return sep !== -1 ? raw.slice(sep).trim() : raw.trim()
+      const lfIdx   = raw.indexOf("\n\n")
+      const sep =
+        crlfIdx !== -1 && (lfIdx === -1 || crlfIdx < lfIdx)
+          ? crlfIdx + 4
+          : lfIdx !== -1 ? lfIdx + 2 : -1
+
+      const headerBlock = sep !== -1 ? raw.slice(0, sep).toLowerCase() : ""
+      const isQP = headerBlock.includes("quoted-printable")
+      const body = sep !== -1 ? raw.slice(sep).trim() : raw.trim()
+      return isQP ? decodeQP(body) : body
     }
 
     const mapped: Email[] = (Array.isArray(data) ? data : []).map(

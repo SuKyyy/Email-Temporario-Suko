@@ -182,11 +182,23 @@ export default function Page() {
     requestNotificationPermission()
   }, [])
 
+  const decodeQP = (s: string): string =>
+    s
+      .replace(/=\r?\n/g, "")
+      .replace(/=([0-9A-Fa-f]{2})/g, (_, h) => decodeURIComponent("%" + h))
+
   const extractBody = (raw: string): string => {
     const crlfIdx = raw.indexOf("\r\n\r\n")
-    const lfIdx = raw.indexOf("\n\n")
-    const sep = crlfIdx !== -1 && (lfIdx === -1 || crlfIdx < lfIdx) ? crlfIdx + 4 : lfIdx !== -1 ? lfIdx + 2 : -1
-    return sep !== -1 ? raw.slice(sep).trim() : raw.trim()
+    const lfIdx   = raw.indexOf("\n\n")
+    const sep =
+      crlfIdx !== -1 && (lfIdx === -1 || crlfIdx < lfIdx)
+        ? crlfIdx + 4
+        : lfIdx !== -1 ? lfIdx + 2 : -1
+
+    const headerBlock = sep !== -1 ? raw.slice(0, sep).toLowerCase() : ""
+    const isQP = headerBlock.includes("quoted-printable")
+    const body = sep !== -1 ? raw.slice(sep).trim() : raw.trim()
+    return isQP ? decodeQP(body) : body
   }
 
   const fetchEmails = useCallback(async (fullAddress: string): Promise<Email[]> => {
