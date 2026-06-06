@@ -81,72 +81,72 @@ export function EmailPage({ dict, lang }: EmailPageProps) {
 
     const data = await res.json()
 
-    // Full MIME parser: handles multipart, base64, quoted-printable
+    // MIME parser: recursively extracts text/html or text/plain from any MIME structure
     const parseMime = (raw: string): string => {
-      const splitHeaders = (block: string) => {
-        const sepCrlf = block.indexOf("\r\n\r\n")
-        const sepLf   = block.indexOf("\n\n")
-        const sep =
-          sepCrlf !== -1 && (sepLf === -1 || sepCrlf < sepLf)
-            ? sepCrlf + 4
-            : sepLf !== -1 ? sepLf + 2 : -1
-        return {
-          headers: sep !== -1 ? block.slice(0, sep).toLowerCase() : "",
-          body:    sep !== -1 ? block.slice(sep) : block,
-        }
+      function splitPart(block: string) {
+        const norm = block.replace(/\r\n/g, "\n")
+        const idx  = norm.indexOf("\n\n")
+        if (idx === -1) return { headers: norm.toLowerCase(), body: "" }
+        return { headers: norm.slice(0, idx).toLowerCase(), body: norm.slice(idx + 2) }
       }
 
-      const decodeQP = (s: string) =>
-        s.replace(/=\r?\n/g, "").replace(/=([0-9A-Fa-f]{2})/g, (_, h) => {
-          try { return decodeURIComponent("%" + h) } catch { return "" }
-        })
+      function getBoundary(headers: string) {
+        const m = headers.match(/boundary=(?:"([^"]+)"|'([^']+)'|([^\s;>\n]+))/i)
+        if (!m) return null
+        return (m[1] ?? m[2] ?? m[3]).replace(/^"|"$/g, "").trim()
+      }
 
-      const decodeB64 = (s: string) => {
+      function decodeB64(s: string) {
         try {
-          const bin = atob(s.replace(/\s/g, ""))
-          const bytes = Uint8Array.from(bin, c => c.charCodeAt(0))
+          const bin   = atob(s.replace(/\s/g, ""))
+          const bytes = Uint8Array.from(bin, (c) => c.charCodeAt(0))
           return new TextDecoder("utf-8").decode(bytes)
-        } catch { return s }
+        } catch { return "" }
       }
 
-      const decodeBody = (body: string, headers: string) => {
-        if (headers.includes("base64"))        return decodeB64(body)
-        if (headers.includes("quoted-printable")) return decodeQP(body)
+      function decodeQP(s: string) {
+        return s
+          .replace(/=\n/g, "")
+          .replace(/=([0-9A-Fa-f]{2})/g, (_, h) => {
+            try { return decodeURIComponent("%" + h) } catch { return "" }
+          })
+      }
+
+      function decodePart(body: string, headers: string) {
+        if (headers.includes("base64"))             return decodeB64(body)
+        if (headers.includes("quoted-printable"))   return decodeQP(body)
         return body
       }
 
-      // Extract boundary — handles both quoted and unquoted values
-      const boundaryMatch = raw.match(/boundary=(?:"([^"]+)"|'([^']+)'|([^\s;>\r\n]+))/i)
-      if (!boundaryMatch) {
-        const { headers, body } = splitHeaders(raw)
-        return decodeBody(body, headers).trim()
-      }
+      // Always recurse every part — handles arbitrarily deep nesting
+      function extract(block: string): { html: string; plain: string } {
+        const { headers, body } = splitPart(block)
+        const boundary = getBoundary(headers)
 
-      const boundary = (boundaryMatch[1] ?? boundaryMatch[2] ?? boundaryMatch[3]).trim()
-      const escaped  = boundary.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
-      const parts    = raw.split(new RegExp(`--${escaped}(?:--)?`))
-
-      // Collect all text/plain and text/html parts
-      let htmlPart  = ""
-      let plainPart = ""
-
-      for (const part of parts) {
-        if (!part.trim() || part.trim() === "--") continue
-        const { headers, body } = splitHeaders(part)
-        // Recurse into nested multipart
-        if (headers.includes("multipart/")) {
-          const nested = parseMime(part.trim())
-          if (nested) htmlPart = htmlPart || nested
-          continue
+        if (boundary) {
+          const esc   = boundary.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+          const parts = body.split(new RegExp(`\n?--${esc}(?:--)?\\n?`))
+          let html = "", plain = ""
+          for (const part of parts) {
+            const t = part.trim()
+            if (!t || t === "--") continue
+            const r = extract(t)
+            if (r.html  && !html)  html  = r.html
+            if (r.plain && !plain) plain = r.plain
+          }
+          return { html, plain }
         }
-        const decoded = decodeBody(body, headers).trim()
-        if (headers.includes("text/html")  && !htmlPart)  htmlPart  = decoded
-        if (headers.includes("text/plain") && !plainPart) plainPart = decoded
+
+        // Leaf node
+        const decoded = decodePart(body, headers).trim()
+        if (headers.includes("text/html"))  return { html: decoded, plain: "" }
+        if (headers.includes("text/plain")) return { html: "", plain: decoded }
+        return { html: "", plain: "" }
       }
 
-      // Prefer HTML; fall back to plain text wrapped in <pre>
-      if (htmlPart)  return htmlPart
-      if (plainPart) return `<pre style="white-space:pre-wrap;font-family:inherit">${plainPart}</pre>`
+      const { html, plain } = extract(raw)
+      if (html)  return html
+      if (plain) return `<pre style="white-space:pre-wrap;font-family:inherit">${plain}</pre>`
       return ""
     }
 

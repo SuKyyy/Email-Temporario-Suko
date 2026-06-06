@@ -85,8 +85,6 @@ function SafeHtmlContent({ html }: { html: string }) {
   useEffect(() => {
     if (!ref.current || !html) return
 
-    console.log("[v0] SafeHtmlContent raw length:", html.length, "starts:", html.slice(0, 80))
-
     // Use DOMParser to safely parse and extract body content
     const parser = new DOMParser()
     const doc = parser.parseFromString(html, "text/html")
@@ -109,7 +107,6 @@ function SafeHtmlContent({ html }: { html: string }) {
     })
 
     const bodyContent = doc.body?.innerHTML ?? doc.documentElement.innerHTML
-    console.log("[v0] SafeHtmlContent body length:", bodyContent.length, "starts:", bodyContent.slice(0, 80))
     ref.current.innerHTML = bodyContent
   }, [html])
 
