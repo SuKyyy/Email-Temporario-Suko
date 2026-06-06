@@ -71,7 +71,7 @@ export function EmailPage({ dict, lang }: EmailPageProps) {
 
   const fetchEmails = useCallback(async (fullAddress: string) => {
     const res = await fetch(
-      `https://inbox-api.zukisukinho.workers.dev/inbox/${encodeURIComponent(fullAddress)}`,
+      `https://inbox-api.izukisukinho.workers.dev/inbox/${encodeURIComponent(fullAddress)}`,
       { cache: "no-store" }
     )
 
