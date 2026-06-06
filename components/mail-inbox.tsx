@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef, useEffect, useMemo } from "react"
+import { useState, useRef, useEffect } from "react"
 import {
   ChevronDown,
   Clock,
@@ -80,20 +80,49 @@ function downloadAttachment(att: Attachment) {
 }
 
 function SafeHtmlContent({ html }: { html: string }) {
-  const isHtml = /<html|<body|<div|<table|<p\b/i.test(html)
+  const ref = useRef<HTMLDivElement>(null)
 
-  const sanitized = useMemo(() => {
-    if (!isHtml) return ""
-    // Remove scripts and dangerous attributes; keep all styles intact
-    return html
-      .replace(/<script[\s\S]*?<\/script>/gi, "")
-      .replace(/<style[\s\S]*?<\/style>/gi, (match) => match) // keep styles
-      .replace(/\son\w+\s*=\s*["'][^"']*["']/gi, "")
-      .replace(/href\s*=\s*["']javascript:[^"']*["']/gi, 'href="#"')
-      // Extract only the body content if it's a full HTML doc
-      .replace(/^[\s\S]*<body[^>]*>([\s\S]*)<\/body>[\s\S]*$/i, "$1")
-  }, [html, isHtml])
+  useEffect(() => {
+    if (!ref.current || !html) return
 
+    console.log("[v0] SafeHtmlContent raw length:", html.length, "starts:", html.slice(0, 80))
+
+    // Use DOMParser to safely parse and extract body content
+    const parser = new DOMParser()
+    const doc = parser.parseFromString(html, "text/html")
+
+    // Remove dangerous elements
+    doc.querySelectorAll("script, object, embed, form").forEach((el) => el.remove())
+
+    // Remove event handlers
+    doc.querySelectorAll("*").forEach((el) => {
+      Array.from(el.attributes).forEach((attr) => {
+        if (attr.name.startsWith("on")) el.removeAttribute(attr.name)
+        if (attr.value.toLowerCase().startsWith("javascript:")) el.removeAttribute(attr.name)
+      })
+    })
+
+    // Open links in new tab
+    doc.querySelectorAll("a[href]").forEach((a) => {
+      a.setAttribute("target", "_blank")
+      a.setAttribute("rel", "noopener noreferrer")
+    })
+
+    const bodyContent = doc.body?.innerHTML ?? doc.documentElement.innerHTML
+    console.log("[v0] SafeHtmlContent body length:", bodyContent.length, "starts:", bodyContent.slice(0, 80))
+    ref.current.innerHTML = bodyContent
+  }, [html])
+
+  if (!html) {
+    return (
+      <div className="overflow-hidden rounded-lg bg-muted p-4">
+        <p className="text-sm text-muted-foreground">(Sem conteudo)</p>
+      </div>
+    )
+  }
+
+  // Plain text fallback — no HTML tags at all
+  const isHtml = /<[a-z][\s\S]*>/i.test(html)
   if (!isHtml) {
     return (
       <div className="overflow-hidden rounded-lg bg-muted p-4">
@@ -106,10 +135,9 @@ function SafeHtmlContent({ html }: { html: string }) {
 
   return (
     <div
-      className="overflow-auto rounded-lg bg-white p-4 text-sm leading-relaxed text-neutral-900"
+      ref={ref}
+      className="overflow-auto rounded-lg bg-white p-4 text-sm leading-relaxed text-neutral-900 [&_*]:max-w-full [&_img]:h-auto"
       style={{ maxHeight: "600px" }}
-      // eslint-disable-next-line react/no-danger
-      dangerouslySetInnerHTML={{ __html: sanitized }}
     />
   )
 }
