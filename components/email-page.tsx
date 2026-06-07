@@ -77,7 +77,7 @@ export function EmailPage({ dict, lang }: EmailPageProps) {
     })
   }, [])
 
-  const fetchGmailEmails = useCallback(async (fullAddress: string): Promise<Email[]> => {
+  const fetchImapEmails = useCallback(async (fullAddress: string): Promise<Email[]> => {
     const res = await fetch(
       `/api/gmail-inbox?email=${encodeURIComponent(fullAddress)}`,
       { cache: "no-store" }
@@ -96,11 +96,12 @@ export function EmailPage({ dict, lang }: EmailPageProps) {
   }, [])
 
   const fetchEmails = useCallback(async (fullAddress: string) => {
-    // Route Gmail addresses through IMAP; everything else through Cloudflare KV
-    if (fullAddress.toLowerCase().endsWith("@gmail.com")) {
-      return fetchGmailEmails(fullAddress)
-    }
+    // All addresses go through IMAP (Forward Email handles all our domains + Gmail forwards).
+    // KV is used as fallback only if IMAP returns empty results.
+    const imapResults = await fetchImapEmails(fullAddress)
+    if (imapResults.length > 0) return imapResults
 
+    // Fallback: Cloudflare KV (legacy, may have truncated bodies for older emails)
     const res = await fetch(
       `https://inbox-api.izukisukinho.workers.dev/inbox/${fullAddress}`,
       { cache: "no-store" }
@@ -243,7 +244,7 @@ export function EmailPage({ dict, lang }: EmailPageProps) {
     )
 
     return dedupeEmails(mapped)
-  }, [dedupeEmails, fetchGmailEmails])
+  }, [dedupeEmails, fetchImapEmails])
 
   const handleAddEmail = useCallback(async () => {
     const trimmed = inputEmail.trim().toLowerCase()
