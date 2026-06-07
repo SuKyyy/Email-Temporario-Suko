@@ -96,22 +96,23 @@ export function EmailPage({ dict, lang }: EmailPageProps) {
   }, [])
 
   const fetchEmails = useCallback(async (fullAddress: string) => {
-    // All addresses go through IMAP (Forward Email handles all our domains + Gmail forwards).
-    // KV is used as fallback only if IMAP returns empty results.
-    const imapResults = await fetchImapEmails(fullAddress)
-    if (imapResults.length > 0) return imapResults
+    // Fetch from BOTH sources and merge:
+    // - IMAP (Forward Email): domains routed through Forward Email + Gmail forwards
+    // - Cloudflare KV: domains routed through the Cloudflare Worker
+    // A given address may have mail in either or both, so we always check both and dedupe.
+    const imapResults = await fetchImapEmails(fullAddress).catch(() => [] as Email[])
 
-    // Fallback: Cloudflare KV (legacy, may have truncated bodies for older emails)
-    const res = await fetch(
-      `https://inbox-api.izukisukinho.workers.dev/inbox/${fullAddress}`,
-      { cache: "no-store" }
-    )
-
-    if (!res.ok) {
-      throw new Error(`Erro ao buscar emails (${res.status})`)
+    let kvData: unknown = []
+    try {
+      const res = await fetch(
+        `https://inbox-api.izukisukinho.workers.dev/inbox/${fullAddress}`,
+        { cache: "no-store" }
+      )
+      if (res.ok) kvData = await res.json()
+    } catch {
+      kvData = []
     }
-
-    const data = await res.json()
+    const data = kvData
 
     // MIME parser: recursively extracts text/html or text/plain from any MIME structure.
     // Works even when the outer envelope headers are huge (Gmail forwarded via Cloudflare)
@@ -229,6 +230,26 @@ export function EmailPage({ dict, lang }: EmailPageProps) {
       return ""
     }
 
+    // Decode MIME encoded-word subjects, e.g. "140297 =?UTF-8?B?4oCTIFNldQ==?= login"
+    const decodeMimeWord = (s: string): string => {
+      return s.replace(/=\?([^?]+)\?([BbQq])\?([^?]*)\?=/g, (_, charset, enc, text) => {
+        try {
+          if (enc.toUpperCase() === "B") {
+            const bin = atob(text.replace(/\s/g, ""))
+            const bytes = Uint8Array.from(bin, (c) => c.charCodeAt(0))
+            return new TextDecoder(charset.toLowerCase().includes("8859") ? "iso-8859-1" : "utf-8").decode(bytes)
+          }
+          // Q-encoding
+          const qp = text.replace(/_/g, " ").replace(/=([0-9A-Fa-f]{2})/g, (_m: string, h: string) =>
+            String.fromCharCode(parseInt(h, 16)))
+          const bytes = Uint8Array.from(qp, (c) => c.charCodeAt(0))
+          return new TextDecoder(charset.toLowerCase().includes("8859") ? "iso-8859-1" : "utf-8").decode(bytes)
+        } catch {
+          return text
+        }
+      })
+    }
+
     const mapped: Email[] = (Array.isArray(data) ? data : []).map(
       (item: { from?: string; subject?: string; date?: string; text?: string }, i: number) => {
         const rawText = item.text ?? ""
@@ -297,7 +318,7 @@ export function EmailPage({ dict, lang }: EmailPageProps) {
         return {
           id: `cf-${fullAddress}-${i}-${item.date ?? i}`,
           from: item.from ?? "Desconhecido",
-          subject: item.subject ?? "(Sem assunto)",
+          subject: decodeMimeWord(item.subject ?? "(Sem assunto)"),
           date: item.date ?? "",
           body: bodyText || `<p style="color:#a0a0a0;font-size:13px;font-style:italic">Sem conteudo.</p>`,
           attachments: [],
@@ -305,7 +326,14 @@ export function EmailPage({ dict, lang }: EmailPageProps) {
       }
     )
 
-    return dedupeEmails(mapped)
+    // Merge IMAP + KV results, dedupe, and sort newest first
+    const combined = dedupeEmails([...imapResults, ...mapped])
+    combined.sort((a, b) => {
+      const ta = a.date ? new Date(a.date).getTime() : 0
+      const tb = b.date ? new Date(b.date).getTime() : 0
+      return tb - ta
+    })
+    return combined
   }, [dedupeEmails, fetchImapEmails])
 
   const handleAddEmail = useCallback(async () => {
