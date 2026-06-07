@@ -233,18 +233,24 @@ export function EmailPage({ dict, lang }: EmailPageProps) {
       (item: { from?: string; subject?: string; date?: string; text?: string }, i: number) => {
         const rawText = item.text ?? ""
 
-        // Decode quoted-printable properly handling multibyte UTF-8 sequences (e.g. Cyrillic =D0=A0)
+        // Decode quoted-printable. Handles both UTF-8 multibyte (e.g. Cyrillic =D0=A0)
+        // and Latin-1 single-byte (e.g. =E3 -> ã) charsets by trying strict UTF-8 first.
         const decodeQP = (s: string): string => {
-          // 1. Remove soft line breaks
           const unfolded = s.replace(/=\r?\n/g, "")
-          // 2. Collect all consecutive =XX tokens as a byte array, decode as UTF-8
           return unfolded.replace(/((?:=[0-9A-Fa-f]{2})+)/g, (match) => {
             const bytes = match.match(/=([0-9A-Fa-f]{2})/g)!
               .map(h => parseInt(h.slice(1), 16))
+            const arr = new Uint8Array(bytes)
             try {
-              return new TextDecoder("utf-8").decode(new Uint8Array(bytes))
+              // Strict UTF-8: throws on invalid sequences (e.g. lone Latin-1 byte)
+              return new TextDecoder("utf-8", { fatal: true }).decode(arr)
             } catch {
-              return match
+              try {
+                // Fall back to Latin-1 (ISO-8859-1) — every byte is a valid char
+                return new TextDecoder("iso-8859-1").decode(arr)
+              } catch {
+                return match
+              }
             }
           })
         }
