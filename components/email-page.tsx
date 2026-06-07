@@ -81,22 +81,12 @@ export function EmailPage({ dict, lang }: EmailPageProps) {
 
     const data = await res.json()
 
-    // MIME parser: recursively extracts text/html or text/plain from any MIME structure
+    // MIME parser: recursively extracts text/html or text/plain from any MIME structure.
+    // Works even when the outer envelope headers are huge (Gmail forwarded via Cloudflare)
+    // and the text field has no blank-line header/body separator.
     const parseMime = (rawInput: string): string => {
-      // Normalize ALL line endings to \n up front, once
+      // Normalize line endings once
       const raw = rawInput.replace(/\r\n/g, "\n").replace(/\r/g, "\n")
-
-      function splitPart(block: string) {
-        const idx = block.indexOf("\n\n")
-        if (idx === -1) return { headers: block.toLowerCase(), body: "" }
-        return { headers: block.slice(0, idx).toLowerCase(), body: block.slice(idx + 2) }
-      }
-
-      function getBoundary(headers: string) {
-        const m = headers.match(/boundary=(?:"([^"]+)"|'([^']+)'|([^\s;>\n]+))/i)
-        if (!m) return null
-        return (m[1] ?? m[2] ?? m[3]).replace(/^["']|["']$/g, "").trim()
-      }
 
       function decodeB64(s: string) {
         try {
@@ -114,23 +104,50 @@ export function EmailPage({ dict, lang }: EmailPageProps) {
           })
       }
 
-      function decodePart(body: string, headers: string) {
-        if (headers.includes("base64"))           return decodeB64(body)
-        if (headers.includes("quoted-printable")) return decodeQP(body)
+      function decodePart(body: string, encoding: string) {
+        if (encoding.includes("base64"))           return decodeB64(body)
+        if (encoding.includes("quoted-printable")) return decodeQP(body)
         return body
       }
 
-      // Always recurse every part — handles arbitrarily deep nesting
+      // Robustly extract header value handling folded lines (RFC 2822 folding)
+      function getHeader(block: string, name: string): string {
+        const re = new RegExp(`^${name}:\\s*([\\s\\S]*?)(?=\\n[^\\t ]|$)`, "im")
+        const m  = block.match(re)
+        if (!m) return ""
+        // unfold: remove newline + whitespace
+        return m[1].replace(/\n[\t ]+/g, " ").trim()
+      }
+
+      // Split a MIME block into {headerBlock, body} at the FIRST blank line
+      function splitBlock(block: string): { headerBlock: string; body: string } {
+        const idx = block.indexOf("\n\n")
+        if (idx === -1) return { headerBlock: block, body: "" }
+        return { headerBlock: block.slice(0, idx), body: block.slice(idx + 2) }
+      }
+
+      function getBoundary(headerBlock: string): string | null {
+        const ct = getHeader(headerBlock, "content-type")
+        const m  = ct.match(/boundary=(?:"([^"]+)"|'([^']+)'|(\S+))/i)
+        if (!m) return null
+        return (m[1] ?? m[2] ?? m[3]).replace(/^["']|["']$/g, "").trim()
+      }
+
+      // Recursively extract html/plain from a single MIME part block
       function extract(block: string): { html: string; plain: string } {
-        const { headers, body } = splitPart(block)
-        const boundary = getBoundary(headers)
+        const { headerBlock, body } = splitBlock(block)
+        const ct       = getHeader(headerBlock, "content-type").toLowerCase()
+        const encoding = getHeader(headerBlock, "content-transfer-encoding").toLowerCase()
+        const boundary = getBoundary(headerBlock)
 
-        console.log("[v0] extract | boundary:", boundary, "| headers snippet:", headers.slice(0, 80))
+        if (boundary || ct.includes("multipart/")) {
+          // Find boundary — may be in a deeper scan if headers were truncated
+          const bnd = boundary ?? raw.match(/boundary=(?:"([^"]+)"|'([^']+)'|(\S+))/i)
+            ?.slice(1).find(Boolean)?.replace(/^["']|["']$/g, "").trim()
+          if (!bnd) return { html: "", plain: "" }
 
-        if (boundary) {
-          const esc   = boundary.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+          const esc   = bnd.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
           const parts = body.split(new RegExp(`--${esc}(?:--)?`))
-          console.log("[v0] split into", parts.length, "parts for boundary:", boundary)
           let html = "", plain = ""
           for (const part of parts) {
             const t = part.trim()
@@ -142,18 +159,41 @@ export function EmailPage({ dict, lang }: EmailPageProps) {
           return { html, plain }
         }
 
-        // Leaf node
-        const decoded = decodePart(body, headers).trim()
-        console.log("[v0] leaf | isHtml:", headers.includes("text/html"), "| isPlain:", headers.includes("text/plain"), "| decoded len:", decoded.length)
-        if (headers.includes("text/html"))  return { html: decoded, plain: "" }
-        if (headers.includes("text/plain")) return { html: "", plain: decoded }
+        const decoded = decodePart(body, encoding).trim()
+        if (ct.includes("text/html"))  return { html: decoded, plain: "" }
+        if (ct.includes("text/plain")) return { html: "", plain: decoded }
         return { html: "", plain: "" }
       }
 
+      // First try: full structured parse
       const { html, plain } = extract(raw)
-      console.log("[v0] parseMime result | html len:", html.length, "| plain len:", plain.length)
       if (html)  return html
       if (plain) return `<pre style="white-space:pre-wrap;font-family:inherit">${plain}</pre>`
+
+      // Fallback: scan the raw for any boundary and try to parse from the first --boundary line
+      // This handles emails where outer headers are truncated (Worker 12k char limit)
+      const anyBoundary = raw.match(/boundary=(?:"([^"]+)"|'([^']+)'|(\S+))/i)
+      if (anyBoundary) {
+        const bnd  = (anyBoundary[1] ?? anyBoundary[2] ?? anyBoundary[3]).replace(/^["']|["']$/g, "").trim()
+        const esc  = bnd.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+        // Find first occurrence of --boundary in the raw and parse from there
+        const startIdx = raw.indexOf(`--${bnd}`)
+        if (startIdx !== -1) {
+          const mimeBody = raw.slice(startIdx)
+          const parts    = mimeBody.split(new RegExp(`--${esc}(?:--)?`))
+          let html2 = "", plain2 = ""
+          for (const part of parts) {
+            const t = part.trim()
+            if (!t || t === "--") continue
+            const r = extract(t)
+            if (r.html  && !html2)  html2  = r.html
+            if (r.plain && !plain2) plain2 = r.plain
+          }
+          if (html2)  return html2
+          if (plain2) return `<pre style="white-space:pre-wrap;font-family:inherit">${plain2}</pre>`
+        }
+      }
+
       return ""
     }
 
@@ -165,7 +205,7 @@ export function EmailPage({ dict, lang }: EmailPageProps) {
           from: item.from ?? "Desconhecido",
           subject: item.subject ?? "(Sem assunto)",
           date: item.date ?? "",
-          body: bodyText || "<p>(Sem conteúdo)</p>",
+          body: bodyText || `<p style="color:#888;font-size:13px">Conteudo nao disponivel — o email recebido so contem headers (possivelmente truncado pelo servidor). Tente abrir o email diretamente no cliente de email original.</p>`,
           attachments: [],
         }
       }

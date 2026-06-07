@@ -183,20 +183,7 @@ export default function Page() {
   }, [])
 
   const parseMime = (rawInput: string): string => {
-    // Normalize ALL line endings to \n up front, once — critical for browser vs Node consistency
     const raw = rawInput.replace(/\r\n/g, "\n").replace(/\r/g, "\n")
-
-    function splitPart(block: string) {
-      const idx = block.indexOf("\n\n")
-      if (idx === -1) return { headers: block.toLowerCase(), body: "" }
-      return { headers: block.slice(0, idx).toLowerCase(), body: block.slice(idx + 2) }
-    }
-
-    function getBoundary(headers: string) {
-      const m = headers.match(/boundary=(?:"([^"]+)"|'([^']+)'|([^\s;>\n]+))/i)
-      if (!m) return null
-      return (m[1] ?? m[2] ?? m[3]).replace(/^["']|["']$/g, "").trim()
-    }
 
     function decodeB64(s: string) {
       try {
@@ -214,18 +201,44 @@ export default function Page() {
         })
     }
 
-    function decodePart(body: string, headers: string) {
-      if (headers.includes("base64"))           return decodeB64(body)
-      if (headers.includes("quoted-printable")) return decodeQP(body)
+    function decodePart(body: string, encoding: string) {
+      if (encoding.includes("base64"))           return decodeB64(body)
+      if (encoding.includes("quoted-printable")) return decodeQP(body)
       return body
     }
 
-    function extract(block: string): { html: string; plain: string } {
-      const { headers, body } = splitPart(block)
-      const boundary = getBoundary(headers)
+    function getHeader(block: string, name: string): string {
+      const re = new RegExp(`^${name}:\\s*([\\s\\S]*?)(?=\\n[^\\t ]|$)`, "im")
+      const m  = block.match(re)
+      if (!m) return ""
+      return m[1].replace(/\n[\t ]+/g, " ").trim()
+    }
 
-      if (boundary) {
-        const esc   = boundary.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+    function splitBlock(block: string): { headerBlock: string; body: string } {
+      const idx = block.indexOf("\n\n")
+      if (idx === -1) return { headerBlock: block, body: "" }
+      return { headerBlock: block.slice(0, idx), body: block.slice(idx + 2) }
+    }
+
+    function getBoundary(headerBlock: string): string | null {
+      const ct = getHeader(headerBlock, "content-type")
+      const m  = ct.match(/boundary=(?:"([^"]+)"|'([^']+)'|(\S+))/i)
+      if (!m) return null
+      return (m[1] ?? m[2] ?? m[3]).replace(/^["']|["']$/g, "").trim()
+    }
+
+    function extract(block: string): { html: string; plain: string } {
+      const { headerBlock, body } = splitBlock(block)
+      const ct       = getHeader(headerBlock, "content-type").toLowerCase()
+      const encoding = getHeader(headerBlock, "content-transfer-encoding").toLowerCase()
+      const boundary = getBoundary(headerBlock)
+
+      if (boundary || ct.includes("multipart/")) {
+        const bnd = boundary ?? raw.match(/boundary=(?:"([^"]+)"|'([^']+)'|(\S+))/i)
+          ?.slice(1).find(Boolean)?.replace(/^["']|["']$/g, "").trim()
+        if (!bnd) return { html: "", plain: "" }
+
+        const esc   = bnd.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
         const parts = body.split(new RegExp(`--${esc}(?:--)?`))
         let html = "", plain = ""
         for (const part of parts) {
@@ -238,15 +251,40 @@ export default function Page() {
         return { html, plain }
       }
 
-      const decoded = decodePart(body, headers).trim()
-      if (headers.includes("text/html"))  return { html: decoded, plain: "" }
-      if (headers.includes("text/plain")) return { html: "", plain: decoded }
+      const decoded = decodePart(body, encoding).trim()
+      if (ct.includes("text/html"))  return { html: decoded, plain: "" }
+      if (ct.includes("text/plain")) return { html: "", plain: decoded }
       return { html: "", plain: "" }
     }
 
+    // First try: full structured parse
     const { html, plain } = extract(raw)
     if (html)  return html
     if (plain) return `<pre style="white-space:pre-wrap;font-family:inherit">${plain}</pre>`
+
+    // Fallback: scan the raw for any boundary and split from first --boundary occurrence
+    // Handles emails where outer headers are huge/truncated (e.g. Gmail forwarded via Cloudflare)
+    const anyBoundary = raw.match(/boundary=(?:"([^"]+)"|'([^']+)'|(\S+))/i)
+    if (anyBoundary) {
+      const bnd  = (anyBoundary[1] ?? anyBoundary[2] ?? anyBoundary[3]).replace(/^["']|["']$/g, "").trim()
+      const esc  = bnd.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+      const startIdx = raw.indexOf(`--${bnd}`)
+      if (startIdx !== -1) {
+        const mimeBody = raw.slice(startIdx)
+        const parts    = mimeBody.split(new RegExp(`--${esc}(?:--)?`))
+        let html2 = "", plain2 = ""
+        for (const part of parts) {
+          const t = part.trim()
+          if (!t || t === "--") continue
+          const r = extract(t)
+          if (r.html  && !html2)  html2  = r.html
+          if (r.plain && !plain2) plain2 = r.plain
+        }
+        if (html2)  return html2
+        if (plain2) return `<pre style="white-space:pre-wrap;font-family:inherit">${plain2}</pre>`
+      }
+    }
+
     return ""
   }
 
