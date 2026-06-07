@@ -249,40 +249,45 @@ export function EmailPage({ dict, lang }: EmailPageProps) {
           })
         }
 
-        // Convert plain text to readable HTML with clickable links
-        const plainTextToHtml = (text: string): string => {
-          // Escape HTML entities first
+        // Render decoded text: if it contains HTML tags render as HTML directly,
+        // otherwise convert bare URLs to <a> and newlines to <br>
+        const renderText = (text: string): string => {
+          const isHtml = /<[a-z][\s\S]*>/i.test(text)
+          if (isHtml) {
+            // Already has HTML tags — linkify bare URLs not already inside <a> and return as-is
+            return text.replace(
+              /(?<!href=["'])(?<![>=])(https?:\/\/[^\s<>"')\]]+)/g,
+              (url) =>
+                `<a href="${url}" target="_blank" rel="noopener noreferrer" style="color:#7c3aed;word-break:break-all">${url}</a>`
+            )
+          }
+          // Pure plain text — escape, linkify, and convert newlines
           let html = text
             .replace(/&/g, "&amp;")
             .replace(/</g, "&lt;")
             .replace(/>/g, "&gt;")
-
-          // Convert markdown-style links [text](url) → <a>
+          // Markdown [label](url)
           html = html.replace(
             /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g,
             (_, label, url) =>
               `<a href="${url}" target="_blank" rel="noopener noreferrer" style="color:#7c3aed;text-decoration:underline">${label}</a>`
           )
-
-          // Convert bare URLs to <a> tags (skip already-linked ones)
+          // Bare URLs
           html = html.replace(
             /(?<![="'(])(https?:\/\/[^\s<>"')\]]+)/g,
             (url) =>
               `<a href="${url}" target="_blank" rel="noopener noreferrer" style="color:#7c3aed;text-decoration:underline;word-break:break-all">${url}</a>`
           )
-
-          // Convert newlines to <br> for readability
           html = html.replace(/\n{2,}/g, "</p><p style='margin:12px 0'>")
           html = html.replace(/\n/g, "<br>")
-
-          return `<div style="font-family:inherit;font-size:14px;line-height:1.7;color:inherit"><p style='margin:0'>${html}</p></div>`
+          return `<p style='margin:0'>${html}</p>`
         }
 
         // parseMime handles full MIME; if it returns empty (plain text body with no MIME headers),
-        // fall back to rendering the raw text directly after decoding QP and linkifying
+        // decode QP first (handles multibyte chars like ã ó ê), then render
         const parsedBody = rawText ? parseMime(rawText) : ""
         const cleanText = decodeQP(rawText.replace(/\r\n/g, "\n").replace(/\r/g, "\n"))
-        const bodyText = parsedBody || (cleanText.trim() ? plainTextToHtml(cleanText) : "")
+        const bodyText = parsedBody || (cleanText.trim() ? renderText(cleanText) : "")
         return {
           id: `cf-${fullAddress}-${i}-${item.date ?? i}`,
           from: item.from ?? "Desconhecido",
