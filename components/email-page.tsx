@@ -278,14 +278,25 @@ export function EmailPage({ dict, lang }: EmailPageProps) {
 
         // Render decoded text: if it contains HTML tags render as HTML directly,
         // otherwise convert bare URLs to <a> and newlines to <br>
+        const linkStyle = "color:#7c3aed;text-decoration:underline;word-break:break-word"
+        // Build a short, clean label for long/tracking URLs (show domain + ellipsis)
+        const shortLabel = (url: string): string => {
+          if (url.length <= 60) return url
+          try {
+            const u = new URL(url)
+            return `${u.hostname.replace(/^www\./, "")} \u2192`
+          } catch {
+            return url.slice(0, 50) + "\u2026"
+          }
+        }
         const renderText = (text: string): string => {
           const isHtml = /<[a-z][\s\S]*>/i.test(text)
           if (isHtml) {
-            // Already has HTML tags — linkify bare URLs not already inside <a> and return as-is
+            // Already has HTML tags — linkify bare URLs not already inside <a>, shortening long ones
             return text.replace(
               /(?<!href=["'])(?<![>=])(https?:\/\/[^\s<>"')\]]+)/g,
               (url) =>
-                `<a href="${url}" target="_blank" rel="noopener noreferrer" style="color:#7c3aed;word-break:break-all">${url}</a>`
+                `<a href="${url}" target="_blank" rel="noopener noreferrer" style="${linkStyle}">${shortLabel(url)}</a>`
             )
           }
           // Pure plain text — escape, linkify, and convert newlines
@@ -297,13 +308,13 @@ export function EmailPage({ dict, lang }: EmailPageProps) {
           html = html.replace(
             /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g,
             (_, label, url) =>
-              `<a href="${url}" target="_blank" rel="noopener noreferrer" style="color:#7c3aed;text-decoration:underline">${label}</a>`
+              `<a href="${url}" target="_blank" rel="noopener noreferrer" style="${linkStyle}">${label}</a>`
           )
-          // Bare URLs
+          // Bare URLs (shorten long tracking links to keep layout clean)
           html = html.replace(
             /(?<![="'(])(https?:\/\/[^\s<>"')\]]+)/g,
             (url) =>
-              `<a href="${url}" target="_blank" rel="noopener noreferrer" style="color:#7c3aed;text-decoration:underline;word-break:break-all">${url}</a>`
+              `<a href="${url}" target="_blank" rel="noopener noreferrer" style="${linkStyle}">${shortLabel(url)}</a>`
           )
           html = html.replace(/\n{2,}/g, "</p><p style='margin:12px 0'>")
           html = html.replace(/\n/g, "<br>")
