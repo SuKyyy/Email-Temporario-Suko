@@ -233,12 +233,21 @@ export function EmailPage({ dict, lang }: EmailPageProps) {
       (item: { from?: string; subject?: string; date?: string; text?: string }, i: number) => {
         const rawText = item.text ?? ""
 
-        // Decode quoted-printable: "=XX" hex sequences and soft line breaks
-        const decodeQP = (s: string) =>
-          s.replace(/=\r?\n/g, "")
-           .replace(/=([0-9A-Fa-f]{2})/g, (_, h) => {
-             try { return decodeURIComponent("%" + h) } catch { return "" }
-           })
+        // Decode quoted-printable properly handling multibyte UTF-8 sequences (e.g. Cyrillic =D0=A0)
+        const decodeQP = (s: string): string => {
+          // 1. Remove soft line breaks
+          const unfolded = s.replace(/=\r?\n/g, "")
+          // 2. Collect all consecutive =XX tokens as a byte array, decode as UTF-8
+          return unfolded.replace(/((?:=[0-9A-Fa-f]{2})+)/g, (match) => {
+            const bytes = match.match(/=([0-9A-Fa-f]{2})/g)!
+              .map(h => parseInt(h.slice(1), 16))
+            try {
+              return new TextDecoder("utf-8").decode(new Uint8Array(bytes))
+            } catch {
+              return match
+            }
+          })
+        }
 
         // parseMime handles full MIME; if it returns empty (plain text body with no MIME headers),
         // fall back to rendering the raw text directly as <pre> after decoding QP
