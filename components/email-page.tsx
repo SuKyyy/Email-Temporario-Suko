@@ -237,7 +237,7 @@ export function EmailPage({ dict, lang }: EmailPageProps) {
           from: item.from ?? "Desconhecido",
           subject: item.subject ?? "(Sem assunto)",
           date: item.date ?? "",
-          body: bodyText || `<p style="color:#888;font-size:13px">Conteudo nao disponivel — o email recebido so contem headers (possivelmente truncado pelo servidor). Tente abrir o email diretamente no cliente de email original.</p>`,
+          body: bodyText || `<p style="color:#a0a0a0;font-size:13px;font-style:italic">Corpo do email nao disponivel. O Worker do Cloudflare precisa ser atualizado para salvar o conteudo completo. Deploy o arquivo <code>worker-inbox-receiver.js</code> no Cloudflare.</p>`,
           attachments: [],
         }
       }
