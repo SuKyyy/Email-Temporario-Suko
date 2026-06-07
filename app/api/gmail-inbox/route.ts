@@ -21,9 +21,13 @@ function searchImapForAddress(targetEmail: string): Promise<ParsedEmail[]> {
       host: "imap.forwardemail.net",
       port: 993,
       tls: true,
-      tlsOptions: { rejectUnauthorized: false },
-      connTimeout: 15000,
-      authTimeout: 10000,
+      tlsOptions: {
+        host: "imap.forwardemail.net",
+        servername: "imap.forwardemail.net",
+        rejectUnauthorized: false,
+      },
+      connTimeout: 20000,
+      authTimeout: 15000,
     })
 
     const results: ParsedEmail[] = []
