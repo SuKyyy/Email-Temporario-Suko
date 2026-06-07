@@ -24,6 +24,14 @@ interface EmailPageProps {
   lang: string
 }
 
+interface ParsedEmailItem {
+  id: string
+  from: string
+  subject: string
+  date: string
+  body: string
+}
+
 export function EmailPage({ dict, lang }: EmailPageProps) {
   const [inputEmail, setInputEmail] = useState("")
   const [headerInputEmail, setHeaderInputEmail] = useState("")
@@ -69,22 +77,275 @@ export function EmailPage({ dict, lang }: EmailPageProps) {
     })
   }, [])
 
-  const fetchEmails = useCallback(async (fullAddress: string) => {
-    const atIndex = fullAddress.lastIndexOf("@")
-    if (atIndex === -1) throw new Error(dict.errors.invalidFormat)
-    
-    const user = fullAddress.slice(0, atIndex)
-    const domain = fullAddress.slice(atIndex)
-
+  const fetchImapEmails = useCallback(async (fullAddress: string): Promise<Email[]> => {
     const res = await fetch(
-      `/api/check-mail?user=${encodeURIComponent(user)}&domain=${encodeURIComponent(domain)}`
+      `/api/gmail-inbox?email=${encodeURIComponent(fullAddress)}`,
+      { cache: "no-store" }
     )
     const data = await res.json()
-    if (!res.ok) {
-      throw new Error(data.error || dict.errors.fetchError)
+    if (!res.ok) throw new Error(data?.error ?? `Erro ao buscar emails Gmail (${res.status})`)
+    if (!Array.isArray(data)) return []
+    return data.map((item: ParsedEmailItem) => ({
+      id: item.id,
+      from: item.from ?? "Desconhecido",
+      subject: item.subject ?? "(Sem assunto)",
+      date: item.date ?? "",
+      body: item.body || `<p style="color:#888;font-size:13px">Sem conteudo.</p>`,
+      attachments: [],
+    }))
+  }, [])
+
+  const fetchEmails = useCallback(async (fullAddress: string) => {
+    // Fetch from BOTH sources and merge:
+    // - IMAP (Forward Email): domains routed through Forward Email + Gmail forwards
+    // - Cloudflare KV: domains routed through the Cloudflare Worker
+    // A given address may have mail in either or both, so we always check both and dedupe.
+    const imapResults = await fetchImapEmails(fullAddress).catch(() => [] as Email[])
+
+    let kvData: unknown = []
+    try {
+      const res = await fetch(
+        `https://inbox-api.izukisukinho.workers.dev/inbox/${fullAddress}`,
+        { cache: "no-store" }
+      )
+      if (res.ok) kvData = await res.json()
+    } catch {
+      kvData = []
     }
-    return dedupeEmails(data.emails as Email[])
-  }, [dict.errors.invalidFormat, dict.errors.fetchError, dedupeEmails])
+    const data = kvData
+
+    // MIME parser: recursively extracts text/html or text/plain from any MIME structure.
+    // Works even when the outer envelope headers are huge (Gmail forwarded via Cloudflare)
+    // and the text field has no blank-line header/body separator.
+    const parseMime = (rawInput: string): string => {
+      // Normalize line endings once
+      const raw = rawInput.replace(/\r\n/g, "\n").replace(/\r/g, "\n")
+
+      function decodeB64(s: string) {
+        try {
+          const bin   = atob(s.replace(/\s/g, ""))
+          const bytes = Uint8Array.from(bin, (c) => c.charCodeAt(0))
+          return new TextDecoder("utf-8").decode(bytes)
+        } catch { return "" }
+      }
+
+      function decodeQP(s: string) {
+        return s
+          .replace(/=\n/g, "")
+          .replace(/=([0-9A-Fa-f]{2})/g, (_, h) => {
+            try { return decodeURIComponent("%" + h) } catch { return "" }
+          })
+      }
+
+      function decodePart(body: string, encoding: string) {
+        if (encoding.includes("base64"))           return decodeB64(body)
+        if (encoding.includes("quoted-printable")) return decodeQP(body)
+        return body
+      }
+
+      // Robustly extract header value handling folded lines (RFC 2822 folding)
+      function getHeader(block: string, name: string): string {
+        const re = new RegExp(`^${name}:\\s*([\\s\\S]*?)(?=\\n[^\\t ]|$)`, "im")
+        const m  = block.match(re)
+        if (!m) return ""
+        // unfold: remove newline + whitespace
+        return m[1].replace(/\n[\t ]+/g, " ").trim()
+      }
+
+      // Split a MIME block into {headerBlock, body} at the FIRST blank line
+      function splitBlock(block: string): { headerBlock: string; body: string } {
+        const idx = block.indexOf("\n\n")
+        if (idx === -1) return { headerBlock: block, body: "" }
+        return { headerBlock: block.slice(0, idx), body: block.slice(idx + 2) }
+      }
+
+      function getBoundary(headerBlock: string): string | null {
+        const ct = getHeader(headerBlock, "content-type")
+        const m  = ct.match(/boundary=(?:"([^"]+)"|'([^']+)'|(\S+))/i)
+        if (!m) return null
+        return (m[1] ?? m[2] ?? m[3]).replace(/^["']|["']$/g, "").trim()
+      }
+
+      // Recursively extract html/plain from a single MIME part block
+      function extract(block: string): { html: string; plain: string } {
+        const { headerBlock, body } = splitBlock(block)
+        const ct       = getHeader(headerBlock, "content-type").toLowerCase()
+        const encoding = getHeader(headerBlock, "content-transfer-encoding").toLowerCase()
+        const boundary = getBoundary(headerBlock)
+
+        if (boundary || ct.includes("multipart/")) {
+          // Find boundary — may be in a deeper scan if headers were truncated
+          const bnd = boundary ?? raw.match(/boundary=(?:"([^"]+)"|'([^']+)'|(\S+))/i)
+            ?.slice(1).find(Boolean)?.replace(/^["']|["']$/g, "").trim()
+          if (!bnd) return { html: "", plain: "" }
+
+          const esc   = bnd.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+          const parts = body.split(new RegExp(`--${esc}(?:--)?`))
+          let html = "", plain = ""
+          for (const part of parts) {
+            const t = part.trim()
+            if (!t || t === "--") continue
+            const r = extract(t)
+            if (r.html  && !html)  html  = r.html
+            if (r.plain && !plain) plain = r.plain
+          }
+          return { html, plain }
+        }
+
+        const decoded = decodePart(body, encoding).trim()
+        if (ct.includes("text/html"))  return { html: decoded, plain: "" }
+        if (ct.includes("text/plain")) return { html: "", plain: decoded }
+        return { html: "", plain: "" }
+      }
+
+      // First try: full structured parse
+      const { html, plain } = extract(raw)
+      if (html)  return html
+      if (plain) return `<pre style="white-space:pre-wrap;font-family:inherit">${plain}</pre>`
+
+      // Fallback: scan the raw for any boundary and try to parse from the first --boundary line
+      // This handles emails where outer headers are truncated (Worker 12k char limit)
+      const anyBoundary = raw.match(/boundary=(?:"([^"]+)"|'([^']+)'|(\S+))/i)
+      if (anyBoundary) {
+        const bnd  = (anyBoundary[1] ?? anyBoundary[2] ?? anyBoundary[3]).replace(/^["']|["']$/g, "").trim()
+        const esc  = bnd.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+        // Find first occurrence of --boundary in the raw and parse from there
+        const startIdx = raw.indexOf(`--${bnd}`)
+        if (startIdx !== -1) {
+          const mimeBody = raw.slice(startIdx)
+          const parts    = mimeBody.split(new RegExp(`--${esc}(?:--)?`))
+          let html2 = "", plain2 = ""
+          for (const part of parts) {
+            const t = part.trim()
+            if (!t || t === "--") continue
+            const r = extract(t)
+            if (r.html  && !html2)  html2  = r.html
+            if (r.plain && !plain2) plain2 = r.plain
+          }
+          if (html2)  return html2
+          if (plain2) return `<pre style="white-space:pre-wrap;font-family:inherit">${plain2}</pre>`
+        }
+      }
+
+      return ""
+    }
+
+    // Decode MIME encoded-word subjects, e.g. "140297 =?UTF-8?B?4oCTIFNldQ==?= login"
+    const decodeMimeWord = (s: string): string => {
+      return s.replace(/=\?([^?]+)\?([BbQq])\?([^?]*)\?=/g, (_, charset, enc, text) => {
+        try {
+          if (enc.toUpperCase() === "B") {
+            const bin = atob(text.replace(/\s/g, ""))
+            const bytes = Uint8Array.from(bin, (c) => c.charCodeAt(0))
+            return new TextDecoder(charset.toLowerCase().includes("8859") ? "iso-8859-1" : "utf-8").decode(bytes)
+          }
+          // Q-encoding
+          const qp = text.replace(/_/g, " ").replace(/=([0-9A-Fa-f]{2})/g, (_m: string, h: string) =>
+            String.fromCharCode(parseInt(h, 16)))
+          const bytes = Uint8Array.from(qp, (c) => c.charCodeAt(0))
+          return new TextDecoder(charset.toLowerCase().includes("8859") ? "iso-8859-1" : "utf-8").decode(bytes)
+        } catch {
+          return text
+        }
+      })
+    }
+
+    const mapped: Email[] = (Array.isArray(data) ? data : []).map(
+      (item: { from?: string; subject?: string; date?: string; text?: string }, i: number) => {
+        const rawText = item.text ?? ""
+
+        // Decode quoted-printable. Handles both UTF-8 multibyte (e.g. Cyrillic =D0=A0)
+        // and Latin-1 single-byte (e.g. =E3 -> ã) charsets by trying strict UTF-8 first.
+        const decodeQP = (s: string): string => {
+          const unfolded = s.replace(/=\r?\n/g, "")
+          return unfolded.replace(/((?:=[0-9A-Fa-f]{2})+)/g, (match) => {
+            const bytes = match.match(/=([0-9A-Fa-f]{2})/g)!
+              .map(h => parseInt(h.slice(1), 16))
+            const arr = new Uint8Array(bytes)
+            try {
+              // Strict UTF-8: throws on invalid sequences (e.g. lone Latin-1 byte)
+              return new TextDecoder("utf-8", { fatal: true }).decode(arr)
+            } catch {
+              try {
+                // Fall back to Latin-1 (ISO-8859-1) — every byte is a valid char
+                return new TextDecoder("iso-8859-1").decode(arr)
+              } catch {
+                return match
+              }
+            }
+          })
+        }
+
+        // Render decoded text: if it contains HTML tags render as HTML directly,
+        // otherwise convert bare URLs to <a> and newlines to <br>
+        const linkStyle = "color:#7c3aed;text-decoration:underline;word-break:break-word"
+        // Build a short, clean label for long/tracking URLs (show domain + ellipsis)
+        const shortLabel = (url: string): string => {
+          if (url.length <= 60) return url
+          try {
+            const u = new URL(url)
+            return `${u.hostname.replace(/^www\./, "")} \u2192`
+          } catch {
+            return url.slice(0, 50) + "\u2026"
+          }
+        }
+        const renderText = (text: string): string => {
+          const isHtml = /<[a-z][\s\S]*>/i.test(text)
+          if (isHtml) {
+            // Already has HTML tags — linkify bare URLs not already inside <a>, shortening long ones
+            return text.replace(
+              /(?<!href=["'])(?<![>=])(https?:\/\/[^\s<>"')\]]+)/g,
+              (url) =>
+                `<a href="${url}" target="_blank" rel="noopener noreferrer" style="${linkStyle}">${shortLabel(url)}</a>`
+            )
+          }
+          // Pure plain text — escape, linkify, and convert newlines
+          let html = text
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+          // Markdown [label](url)
+          html = html.replace(
+            /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g,
+            (_, label, url) =>
+              `<a href="${url}" target="_blank" rel="noopener noreferrer" style="${linkStyle}">${label}</a>`
+          )
+          // Bare URLs (shorten long tracking links to keep layout clean)
+          html = html.replace(
+            /(?<![="'(])(https?:\/\/[^\s<>"')\]]+)/g,
+            (url) =>
+              `<a href="${url}" target="_blank" rel="noopener noreferrer" style="${linkStyle}">${shortLabel(url)}</a>`
+          )
+          html = html.replace(/\n{2,}/g, "</p><p style='margin:12px 0'>")
+          html = html.replace(/\n/g, "<br>")
+          return `<p style='margin:0'>${html}</p>`
+        }
+
+        // parseMime handles full MIME; if it returns empty (plain text body with no MIME headers),
+        // decode QP first (handles multibyte chars like ã ó ê), then render
+        const parsedBody = rawText ? parseMime(rawText) : ""
+        const cleanText = decodeQP(rawText.replace(/\r\n/g, "\n").replace(/\r/g, "\n"))
+        const bodyText = parsedBody || (cleanText.trim() ? renderText(cleanText) : "")
+        return {
+          id: `cf-${fullAddress}-${i}-${item.date ?? i}`,
+          from: item.from ?? "Desconhecido",
+          subject: decodeMimeWord(item.subject ?? "(Sem assunto)"),
+          date: item.date ?? "",
+          body: bodyText || `<p style="color:#a0a0a0;font-size:13px;font-style:italic">Sem conteudo.</p>`,
+          attachments: [],
+        }
+      }
+    )
+
+    // Merge IMAP + KV results, dedupe, and sort newest first
+    const combined = dedupeEmails([...imapResults, ...mapped])
+    combined.sort((a, b) => {
+      const ta = a.date ? new Date(a.date).getTime() : 0
+      const tb = b.date ? new Date(b.date).getTime() : 0
+      return tb - ta
+    })
+    return combined
+  }, [dedupeEmails, fetchImapEmails])
 
   const handleAddEmail = useCallback(async () => {
     const trimmed = inputEmail.trim().toLowerCase()
@@ -592,8 +853,9 @@ export function EmailPage({ dict, lang }: EmailPageProps) {
                   isLoading={loading}
                   isRefreshing={refreshing}
                   isPolling={false}
-                  statusMessage={null}
+                  statusMessage={statusMessage}
                   countdown={0}
+                  fetchError={error}
                   onRefresh={handleRefresh}
                   dict={dict}
                 />
@@ -703,6 +965,7 @@ export function EmailPage({ dict, lang }: EmailPageProps) {
       <footer className="border-t border-border py-3 text-center text-xs text-muted-foreground">
         <p>{dict.footer.text}</p>
       </footer>
+
     </div>
   )
 }

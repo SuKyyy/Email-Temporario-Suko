@@ -7,9 +7,8 @@ import { SiteHeader } from "@/components/site-header"
 import { EmailInput } from "@/components/email-input"
 import { Inbox, type Email } from "@/components/mail-inbox"
 
-
-const POLL_SECONDS = 10
 const NEW_URL = "https://tempmailsuko.shop/"
+const CF_INBOX_API = "https://inbox-api.izukisukinho.workers.dev/inbox"
 
 // Hardcoded Portuguese dictionary for standalone page
 const dict = {
@@ -170,45 +169,150 @@ function MigrationModal({ onClose }: { onClose: () => void }) {
 export default function Page() {
   const [showModal, setShowModal] = useState(true)
   const [email, setEmail] = useState("")
-  const [error, setError] = useState<string | null>(null)
+  const [fetchError, setFetchError] = useState<string | null>(null)
   const [emails, setEmails] = useState<Email[]>([])
   const [loading, setLoading] = useState(false)
   const [refreshing, setRefreshing] = useState(false)
-  const [isPolling, setIsPolling] = useState(false)
   const [activeUser, setActiveUser] = useState<string | null>(null)
   const [activeDomain, setActiveDomain] = useState<string | null>(null)
   const [hasSearched, setHasSearched] = useState(false)
   const [statusMessage, setStatusMessage] = useState<string | null>(null)
-  const [countdown, setCountdown] = useState(POLL_SECONDS)
-
-  const activeUserRef = useRef(activeUser)
-  const activeDomainRef = useRef(activeDomain)
-  const emailsRef = useRef(emails)
-  const fetchingRef = useRef(false)
-
-  useEffect(() => { activeUserRef.current = activeUser }, [activeUser])
-  useEffect(() => { activeDomainRef.current = activeDomain }, [activeDomain])
-  useEffect(() => { emailsRef.current = emails }, [emails])
 
   useEffect(() => {
     requestNotificationPermission()
   }, [])
 
-  const fetchEmails = useCallback(async (user: string, domain: string) => {
-    const res = await fetch(
-      `/api/check-mail?user=${encodeURIComponent(user)}&domain=${encodeURIComponent(domain)}`
-    )
-    const data = await res.json()
-    if (!res.ok) {
-      throw new Error(data.error || dict.errors.fetchError)
+  const parseMime = (rawInput: string): string => {
+    const raw = rawInput.replace(/\r\n/g, "\n").replace(/\r/g, "\n")
+
+    function decodeB64(s: string) {
+      try {
+        const bin   = atob(s.replace(/\s/g, ""))
+        const bytes = Uint8Array.from(bin, (c) => c.charCodeAt(0))
+        return new TextDecoder("utf-8").decode(bytes)
+      } catch { return "" }
     }
-    return data.emails as Email[]
+
+    function decodeQP(s: string) {
+      return s
+        .replace(/=\n/g, "")
+        .replace(/=([0-9A-Fa-f]{2})/g, (_, h) => {
+          try { return decodeURIComponent("%" + h) } catch { return "" }
+        })
+    }
+
+    function decodePart(body: string, encoding: string) {
+      if (encoding.includes("base64"))           return decodeB64(body)
+      if (encoding.includes("quoted-printable")) return decodeQP(body)
+      return body
+    }
+
+    function getHeader(block: string, name: string): string {
+      const re = new RegExp(`^${name}:\\s*([\\s\\S]*?)(?=\\n[^\\t ]|$)`, "im")
+      const m  = block.match(re)
+      if (!m) return ""
+      return m[1].replace(/\n[\t ]+/g, " ").trim()
+    }
+
+    function splitBlock(block: string): { headerBlock: string; body: string } {
+      const idx = block.indexOf("\n\n")
+      if (idx === -1) return { headerBlock: block, body: "" }
+      return { headerBlock: block.slice(0, idx), body: block.slice(idx + 2) }
+    }
+
+    function getBoundary(headerBlock: string): string | null {
+      const ct = getHeader(headerBlock, "content-type")
+      const m  = ct.match(/boundary=(?:"([^"]+)"|'([^']+)'|(\S+))/i)
+      if (!m) return null
+      return (m[1] ?? m[2] ?? m[3]).replace(/^["']|["']$/g, "").trim()
+    }
+
+    function extract(block: string): { html: string; plain: string } {
+      const { headerBlock, body } = splitBlock(block)
+      const ct       = getHeader(headerBlock, "content-type").toLowerCase()
+      const encoding = getHeader(headerBlock, "content-transfer-encoding").toLowerCase()
+      const boundary = getBoundary(headerBlock)
+
+      if (boundary || ct.includes("multipart/")) {
+        const bnd = boundary ?? raw.match(/boundary=(?:"([^"]+)"|'([^']+)'|(\S+))/i)
+          ?.slice(1).find(Boolean)?.replace(/^["']|["']$/g, "").trim()
+        if (!bnd) return { html: "", plain: "" }
+
+        const esc   = bnd.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+        const parts = body.split(new RegExp(`--${esc}(?:--)?`))
+        let html = "", plain = ""
+        for (const part of parts) {
+          const t = part.trim()
+          if (!t || t === "--") continue
+          const r = extract(t)
+          if (r.html  && !html)  html  = r.html
+          if (r.plain && !plain) plain = r.plain
+        }
+        return { html, plain }
+      }
+
+      const decoded = decodePart(body, encoding).trim()
+      if (ct.includes("text/html"))  return { html: decoded, plain: "" }
+      if (ct.includes("text/plain")) return { html: "", plain: decoded }
+      return { html: "", plain: "" }
+    }
+
+    // First try: full structured parse
+    const { html, plain } = extract(raw)
+    if (html)  return html
+    if (plain) return `<pre style="white-space:pre-wrap;font-family:inherit">${plain}</pre>`
+
+    // Fallback: scan the raw for any boundary and split from first --boundary occurrence
+    // Handles emails where outer headers are huge/truncated (e.g. Gmail forwarded via Cloudflare)
+    const anyBoundary = raw.match(/boundary=(?:"([^"]+)"|'([^']+)'|(\S+))/i)
+    if (anyBoundary) {
+      const bnd  = (anyBoundary[1] ?? anyBoundary[2] ?? anyBoundary[3]).replace(/^["']|["']$/g, "").trim()
+      const esc  = bnd.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+      const startIdx = raw.indexOf(`--${bnd}`)
+      if (startIdx !== -1) {
+        const mimeBody = raw.slice(startIdx)
+        const parts    = mimeBody.split(new RegExp(`--${esc}(?:--)?`))
+        let html2 = "", plain2 = ""
+        for (const part of parts) {
+          const t = part.trim()
+          if (!t || t === "--") continue
+          const r = extract(t)
+          if (r.html  && !html2)  html2  = r.html
+          if (r.plain && !plain2) plain2 = r.plain
+        }
+        if (html2)  return html2
+        if (plain2) return `<pre style="white-space:pre-wrap;font-family:inherit">${plain2}</pre>`
+      }
+    }
+
+    return ""
+  }
+
+  const fetchEmails = useCallback(async (fullAddress: string): Promise<Email[]> => {
+    const res = await fetch(
+      `${CF_INBOX_API}/${fullAddress}`,
+      { cache: "no-store" }
+    )
+    if (!res.ok) throw new Error(`Erro ao buscar emails (${res.status})`)
+    const data = await res.json()
+    return (Array.isArray(data) ? data : []).map(
+      (item: { from?: string; subject?: string; date?: string; text?: string }, i: number) => {
+        const bodyText = item.text ? parseMime(item.text) : ""
+        return {
+          id: `cf-${fullAddress}-${i}-${item.date ?? i}`,
+          from: item.from ?? "Desconhecido",
+          subject: item.subject ?? "(Sem assunto)",
+          date: item.date ?? "",
+          body: bodyText || "<p>(Sem conteúdo)</p>",
+          attachments: [],
+        }
+      }
+    )
   }, [])
 
   const checkForNewEmails = useCallback((prev: Email[], next: Email[]) => {
     const prevIds = new Set(prev.map((e) => e.id))
     const newEmails = next.filter((e) => !prevIds.has(e.id))
-
     if (newEmails.length > 0) {
       playNotificationSound()
       const first = newEmails[0]
@@ -217,74 +321,28 @@ export default function Page() {
         newEmails.length === 1
           ? dict.notifications.newEmailToastOne
           : dict.notifications.newEmailToastMany.replace("{count}", String(newEmails.length))
-      toast.success(msg, {
-        description: first.subject,
-      })
+      toast.success(msg, { description: first.subject })
     }
-
     return newEmails.length > 0
   }, [])
-
-  useEffect(() => {
-    if (!activeUser || !activeDomain) return
-
-    setCountdown(POLL_SECONDS)
-
-    const interval = setInterval(() => {
-      setCountdown((prev) => {
-        if (prev <= 1) {
-          if (!fetchingRef.current && activeUserRef.current && activeDomainRef.current) {
-            fetchingRef.current = true
-            setIsPolling(true)
-            fetchEmails(activeUserRef.current, activeDomainRef.current)
-              .then((result) => {
-                const currentIds = emailsRef.current.map((e) => e.id).join(",")
-                const newIds = result.map((e) => e.id).join(",")
-                if (currentIds !== newIds) {
-                  checkForNewEmails(emailsRef.current, result)
-                  setEmails(result)
-                }
-              })
-              .catch(() => {})
-              .finally(() => {
-                fetchingRef.current = false
-                setIsPolling(false)
-              })
-          }
-          return POLL_SECONDS
-        }
-        return prev - 1
-      })
-    }, 1000)
-
-    return () => clearInterval(interval)
-  }, [activeUser, activeDomain, fetchEmails, checkForNewEmails])
 
   const handleCheckMail = useCallback(async () => {
     const trimmed = email.trim()
     if (!trimmed) return
 
     const atIndex = trimmed.lastIndexOf("@")
-    if (atIndex === -1) {
-      setError(dict.errors.invalidFormat)
-      return
-    }
+    if (atIndex === -1) { setFetchError(dict.errors.invalidFormat); return }
 
     const user = trimmed.slice(0, atIndex)
     const domain = trimmed.slice(atIndex)
+    if (!user) { setFetchError(dict.errors.noUsername); return }
 
-    if (!user) {
-      setError(dict.errors.noUsername)
-      return
-    }
-
-    setError(null)
+    setFetchError(null)
     setLoading(true)
     setStatusMessage(null)
 
     try {
-      const result = await fetchEmails(user, domain)
-      setLoading(false)
+      const result = await fetchEmails(trimmed)
       setHasSearched(true)
       setEmails(result)
       setActiveUser(user)
@@ -292,9 +350,10 @@ export default function Page() {
       setStatusMessage(dict.status.inboxUpdated)
       setTimeout(() => setStatusMessage(null), 3000)
     } catch (err) {
-      setLoading(false)
-      setError(err instanceof Error ? err.message : dict.errors.genericError)
+      setFetchError(err instanceof Error ? err.message : dict.errors.genericError)
       setEmails([])
+    } finally {
+      setLoading(false)
     }
   }, [email, fetchEmails])
 
@@ -302,27 +361,27 @@ export default function Page() {
     if (!activeUser || !activeDomain) return
 
     setRefreshing(true)
-    setCountdown(POLL_SECONDS)
     setStatusMessage(dict.status.checkingNewEmails)
 
     try {
-      const result = await fetchEmails(activeUser, activeDomain)
-      setRefreshing(false)
+      const result = await fetchEmails(`${activeUser}${activeDomain}`)
       checkForNewEmails(emails, result)
       setEmails(result)
+      setFetchError(null)
       setStatusMessage(dict.status.inboxUpdated)
       setTimeout(() => setStatusMessage(null), 3000)
     } catch (err) {
-      setRefreshing(false)
       setStatusMessage(err instanceof Error ? err.message : dict.errors.updateError)
       setTimeout(() => setStatusMessage(null), 5000)
+    } finally {
+      setRefreshing(false)
     }
   }, [activeUser, activeDomain, fetchEmails, emails, checkForNewEmails])
 
   const handleEmailChange = useCallback((value: string) => {
     setEmail(value)
-    if (error) setError(null)
-  }, [error])
+    if (fetchError) setFetchError(null)
+  }, [fetchError])
 
   const activeAddress = activeUser && activeDomain ? `${activeUser}${activeDomain}` : null
 
@@ -345,7 +404,7 @@ export default function Page() {
 
           <EmailInput
             email={email}
-            error={error}
+            error={fetchError}
             activeAddress={activeAddress}
             onEmailChange={handleEmailChange}
             onSubmit={handleCheckMail}
@@ -360,9 +419,10 @@ export default function Page() {
             hasSearched={hasSearched}
             isLoading={loading}
             isRefreshing={refreshing}
-            isPolling={isPolling}
+            isPolling={false}
             statusMessage={statusMessage}
-            countdown={countdown}
+            countdown={0}
+            fetchError={fetchError}
             onRefresh={handleManualRefresh}
             dict={dict}
           />
