@@ -232,11 +232,20 @@ export function EmailPage({ dict, lang }: EmailPageProps) {
     const mapped: Email[] = (Array.isArray(data) ? data : []).map(
       (item: { from?: string; subject?: string; date?: string; text?: string }, i: number) => {
         const rawText = item.text ?? ""
+
+        // Decode quoted-printable: "=XX" hex sequences and soft line breaks
+        const decodeQP = (s: string) =>
+          s.replace(/=\r?\n/g, "")
+           .replace(/=([0-9A-Fa-f]{2})/g, (_, h) => {
+             try { return decodeURIComponent("%" + h) } catch { return "" }
+           })
+
         // parseMime handles full MIME; if it returns empty (plain text body with no MIME headers),
-        // fall back to rendering the raw text directly as <pre>
+        // fall back to rendering the raw text directly as <pre> after decoding QP
         const parsedBody = rawText ? parseMime(rawText) : ""
-        const bodyText = parsedBody || (rawText.trim()
-          ? `<pre style="white-space:pre-wrap;word-break:break-word;font-family:inherit;font-size:14px;line-height:1.6">${rawText
+        const cleanText = decodeQP(rawText.replace(/\r\n/g, "\n").replace(/\r/g, "\n"))
+        const bodyText = parsedBody || (cleanText.trim()
+          ? `<pre style="white-space:pre-wrap;word-break:break-word;font-family:inherit;font-size:14px;line-height:1.6">${cleanText
               .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}</pre>`
           : "")
         return {
