@@ -231,13 +231,20 @@ export function EmailPage({ dict, lang }: EmailPageProps) {
 
     const mapped: Email[] = (Array.isArray(data) ? data : []).map(
       (item: { from?: string; subject?: string; date?: string; text?: string }, i: number) => {
-        const bodyText = item.text ? parseMime(item.text) : ""
+        const rawText = item.text ?? ""
+        // parseMime handles full MIME; if it returns empty (plain text body with no MIME headers),
+        // fall back to rendering the raw text directly as <pre>
+        const parsedBody = rawText ? parseMime(rawText) : ""
+        const bodyText = parsedBody || (rawText.trim()
+          ? `<pre style="white-space:pre-wrap;word-break:break-word;font-family:inherit;font-size:14px;line-height:1.6">${rawText
+              .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}</pre>`
+          : "")
         return {
           id: `cf-${fullAddress}-${i}-${item.date ?? i}`,
           from: item.from ?? "Desconhecido",
           subject: item.subject ?? "(Sem assunto)",
           date: item.date ?? "",
-          body: bodyText || `<p style="color:#a0a0a0;font-size:13px;font-style:italic">Corpo do email nao disponivel. O Worker do Cloudflare precisa ser atualizado para salvar o conteudo completo. Deploy o arquivo <code>worker-inbox-receiver.js</code> no Cloudflare.</p>`,
+          body: bodyText || `<p style="color:#a0a0a0;font-size:13px;font-style:italic">Sem conteudo.</p>`,
           attachments: [],
         }
       }
