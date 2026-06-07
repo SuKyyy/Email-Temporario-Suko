@@ -28,8 +28,11 @@ function parseMimeBody(raw) {
 
   function decodeB64(s) {
     try {
-      const bin = atob(s.replace(/\s/g, ''));
-      const bytes = Uint8Array.from(bin, c => c.charCodeAt(0));
+      // Cloudflare Workers supports atob() natively (it's a V8 isolate with Web APIs)
+      const cleaned = s.replace(/\s/g, '');
+      const bin = atob(cleaned);
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
       return new TextDecoder('utf-8').decode(bytes);
     } catch { return ''; }
   }
@@ -125,9 +128,14 @@ export default {
         intendedFor = deliveredTo.toLowerCase().trim();
       } else if (xOriginalTo && xOriginalTo.includes('@')) {
         intendedFor = xOriginalTo.toLowerCase().trim();
-      } else if (from.includes('+caf_=')) {
-        const match = from.match(/\+caf_=([^@]+@[^@]+)/i);
-        if (match) intendedFor = match[1].replace('=', '@').toLowerCase();
+      } else if (to.includes('+caf_=')) {
+        // Gmail forwarding: to = prefix+caf_=user=domain.com@gmail.com
+        // Extract "user=domain.com" and replace last = with @
+        const match = to.match(/\+caf_=(.+?)@/i);
+        if (match) {
+          // "abusadordoamin=thesuaky.shop" -> "abusadordoamin@thesuaky.shop"
+          intendedFor = match[1].replace(/=([^=]+)$/, '@$1').toLowerCase();
+        }
       }
 
       // Read the FULL raw email (no substring truncation)
@@ -150,7 +158,8 @@ export default {
         intendedFor,
       };
 
-      const key = `${to}:${Date.now()}`;
+      // Key uses intendedFor (the real destination) so the inbox API can find it
+      const key = `${intendedFor}:${Date.now()}`;
       // Store for 24h
       await env.EMAILS.put(key, JSON.stringify(data), { expirationTtl: 86400 });
 
