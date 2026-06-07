@@ -67,6 +67,62 @@ export function EmailPage({ dict, lang }: EmailPageProps) {
     }
   }, [savedEmails])
 
+  // Turn a raw From header into a clean, friendly sender name.
+  // Handles: display names ("ChatGPT" <x@y>), bounce/VERP addresses
+  // (bounces+123-...@em.spotify.com), and derives a brand from the domain.
+  const cleanSender = useCallback((raw: string): string => {
+    if (!raw) return "Desconhecido"
+    let value = raw.trim()
+
+    // 1. Prefer the display name if present: "Name" <email> or Name <email>
+    const displayMatch = value.match(/^\s*"?([^"<]+?)"?\s*<[^>]+>/)
+    if (displayMatch) {
+      const name = displayMatch[1].trim()
+      // Ignore display names that are just an email address
+      if (name && !/@/.test(name)) return name
+    }
+
+    // 2. Extract the email address (inside <> or the whole string)
+    const angle = value.match(/<([^>]+)>/)
+    const addr = (angle ? angle[1] : value).trim()
+    const domainPart = addr.split("@")[1] ?? addr
+
+    if (!domainPart) return addr || "Desconhecido"
+
+    // 3. Derive brand from the domain, stripping mail subdomains
+    const labels = domainPart
+      .toLowerCase()
+      .replace(/[<>]/g, "")
+      .split(".")
+      .filter(Boolean)
+    // Drop generic mail-server / tld labels to find the brand label
+    const junk = new Set([
+      "com", "net", "org", "io", "co", "email", "mail", "em", "tm",
+      "mailer", "smtp", "mx", "send", "sendgrid", "mailgun", "amazonses",
+      "info", "br", "us", "app",
+    ])
+    let brand =
+      labels.filter((l) => !junk.has(l) && !/^em\d+$/.test(l) && !/^\d+$/.test(l)).pop() ??
+      labels[0] ??
+      domainPart
+    // Known brands with specific casing
+    const knownBrands: Record<string, string> = {
+      openai: "OpenAI",
+      chatgpt: "ChatGPT",
+      spotify: "Spotify",
+      paypal: "PayPal",
+      github: "GitHub",
+      youtube: "YouTube",
+      whatsapp: "WhatsApp",
+      tiktok: "TikTok",
+      linkedin: "LinkedIn",
+    }
+    if (knownBrands[brand]) return knownBrands[brand]
+    // Capitalize first letter
+    brand = brand.charAt(0).toUpperCase() + brand.slice(1)
+    return brand
+  }, [])
+
   // Deduplicate emails by id
   const dedupeEmails = useCallback((emailList: Email[]): Email[] => {
     const seen = new Set<string>()
@@ -87,13 +143,13 @@ export function EmailPage({ dict, lang }: EmailPageProps) {
     if (!Array.isArray(data)) return []
     return data.map((item: ParsedEmailItem) => ({
       id: item.id,
-      from: item.from ?? "Desconhecido",
+      from: cleanSender(item.from ?? ""),
       subject: item.subject ?? "(Sem assunto)",
       date: item.date ?? "",
       body: item.body || `<p style="color:#888;font-size:13px">Sem conteudo.</p>`,
       attachments: [],
     }))
-  }, [])
+  }, [cleanSender])
 
   const fetchEmails = useCallback(async (fullAddress: string) => {
     // Fetch from BOTH sources and merge:
@@ -328,7 +384,7 @@ export function EmailPage({ dict, lang }: EmailPageProps) {
         const bodyText = parsedBody || (cleanText.trim() ? renderText(cleanText) : "")
         return {
           id: `cf-${fullAddress}-${i}-${item.date ?? i}`,
-          from: item.from ?? "Desconhecido",
+          from: cleanSender(item.from ?? ""),
           subject: decodeMimeWord(item.subject ?? "(Sem assunto)"),
           date: item.date ?? "",
           body: bodyText || `<p style="color:#a0a0a0;font-size:13px;font-style:italic">Sem conteudo.</p>`,
@@ -345,7 +401,7 @@ export function EmailPage({ dict, lang }: EmailPageProps) {
       return tb - ta
     })
     return combined
-  }, [dedupeEmails, fetchImapEmails])
+  }, [dedupeEmails, fetchImapEmails, cleanSender])
 
   const handleAddEmail = useCallback(async () => {
     const trimmed = inputEmail.trim().toLowerCase()
