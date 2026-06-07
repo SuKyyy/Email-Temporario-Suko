@@ -24,6 +24,14 @@ interface EmailPageProps {
   lang: string
 }
 
+interface ParsedEmailItem {
+  id: string
+  from: string
+  subject: string
+  date: string
+  body: string
+}
+
 export function EmailPage({ dict, lang }: EmailPageProps) {
   const [inputEmail, setInputEmail] = useState("")
   const [headerInputEmail, setHeaderInputEmail] = useState("")
@@ -69,7 +77,30 @@ export function EmailPage({ dict, lang }: EmailPageProps) {
     })
   }, [])
 
+  const fetchGmailEmails = useCallback(async (fullAddress: string): Promise<Email[]> => {
+    const res = await fetch(
+      `/api/gmail-inbox?email=${encodeURIComponent(fullAddress)}`,
+      { cache: "no-store" }
+    )
+    const data = await res.json()
+    if (!res.ok) throw new Error(data?.error ?? `Erro ao buscar emails Gmail (${res.status})`)
+    if (!Array.isArray(data)) return []
+    return data.map((item: ParsedEmailItem) => ({
+      id: item.id,
+      from: item.from ?? "Desconhecido",
+      subject: item.subject ?? "(Sem assunto)",
+      date: item.date ?? "",
+      body: item.body || `<p style="color:#888;font-size:13px">Sem conteudo.</p>`,
+      attachments: [],
+    }))
+  }, [])
+
   const fetchEmails = useCallback(async (fullAddress: string) => {
+    // Route Gmail addresses through IMAP; everything else through Cloudflare KV
+    if (fullAddress.toLowerCase().endsWith("@gmail.com")) {
+      return fetchGmailEmails(fullAddress)
+    }
+
     const res = await fetch(
       `https://inbox-api.izukisukinho.workers.dev/inbox/${fullAddress}`,
       { cache: "no-store" }
@@ -212,7 +243,7 @@ export function EmailPage({ dict, lang }: EmailPageProps) {
     )
 
     return dedupeEmails(mapped)
-  }, [dedupeEmails])
+  }, [dedupeEmails, fetchGmailEmails])
 
   const handleAddEmail = useCallback(async () => {
     const trimmed = inputEmail.trim().toLowerCase()
